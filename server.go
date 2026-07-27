@@ -6,6 +6,12 @@ import (
        )
 
 func main(){
+     server(":8080")
+}
+
+
+
+func server(port string){
 
      http.HandleFunc("/", func(w http.ResponseWriter,r *http.Request){
 
@@ -13,13 +19,17 @@ func main(){
 
 	})
 
-     http.ListenAndServe(":8080", nil)
-     }
+     http.ListenAndServe(port, nil)
+}
+
 
 
 /*
-Retorna os detalhes da chamada HTTP em formato de string
+
+Retorna os detalhes da chamada HTTP em string
+
 */
+
 func httpDetail(request *http.Request) []string {
      details := []string{
 		"- Method: "+fmt.Sprint(request.Method)+"\n",
