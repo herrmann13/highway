@@ -21,11 +21,35 @@ func server(port string){
 
      	
 	w.Header().Set("Content-Type", "application/json")
-	fmt.Fprintln(w, httpDetail(r))
+	fmt.Fprintln(w, "Server Online")
 
-	})
+
+     })
+
+     http.HandleFunc("/users", func(w http.ResponseWriter,r *http.Request){
+     			     
+        switch r.Method {
+
+	case "GET":
+
+	     fmt.Fprintln(w, "Método GET em /users")
+
+	case "POST":
+
+	     fmt.Fprintln(w, "Método POST em /users")
+
+	case "PUT":
+
+             fmt.Fprintln(w, "Método PUT  em /users")
+
+	case "DELETE":
+
+	     fmt.Fprintln(w, "Método DELETE em /users")
+
+	}
+
+     })
 	
-
      http.ListenAndServe(port, nil)
 }
 
