@@ -45,6 +45,13 @@ func server(port string){
 	     fmt.Fprintln(w, "Método POST em /users")
 
 	case "PUT":
+	
+	     id := r.URL.Query().Get("userId")
+
+	     if id == nil {
+	     	http.Error(w, "Parametro id é obrigatório", http.StatusBadRequest)
+		return
+	     }
 
              fmt.Fprintln(w, "Método PUT  em /users")
 
