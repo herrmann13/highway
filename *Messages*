@@ -1,0 +1,57 @@
+For information about GNU Emacs and the GNU system, type C-h C-a.
+server.go has auto save data; consider M-x recover-this-file
+user-error: No resizable window below this one [3 times]
+Beginning of buffer [3 times]
+Mark set
+Auto-saving...done
+Mark set [5 times]
+<backtab> is undefined [2 times]
+Beginning of buffer
+Saving file /Users/henriqueherrmann/Documents/GO/server.go...
+Wrote /Users/henriqueherrmann/Documents/GO/server.go
+Auto-saving...done
+Mark set [2 times]
+Auto-saving...done
+Auto-saving...done
+Mark set
+Indenting region...done
+Auto-saving...done
+Mark set [3 times]
+Indenting region...done
+Saving file /Users/henriqueherrmann/Documents/GO/server.go...
+Wrote /Users/henriqueherrmann/Documents/GO/server.go
+Saving file /Users/henriqueherrmann/Documents/GO/server.go...
+Wrote /Users/henriqueherrmann/Documents/GO/server.go
+Mark set [4 times]
+Saving file /Users/henriqueherrmann/Documents/GO/server.go...
+Wrote /Users/henriqueherrmann/Documents/GO/server.go
+Mark set
+Beginning of buffer
+Auto-saving...done
+Auto-saving...done
+Beginning of buffer
+Mark set
+Saving file /Users/henriqueherrmann/Documents/GO/server.go...
+Wrote /Users/henriqueherrmann/Documents/GO/server.go
+Beginning of buffer [15 times]
+Making completion list...
+choose-completion: No completion here
+Wrote /Users/henriqueherrmann/Documents/GO/*Messages*
+Beginning of buffer [5 times]
+delete-backward-char: Text is read-only [4 times]
+completing-read-default: Command attempted to use minibuffer while in minibuffer
+repeat-complex-command: There are no previous complex commands to repeat
+C-M-x C-s is undefined
+completing-read-default: Command attempted to use minibuffer while in minibuffer
+execute-extended-command: ‘’ is not a valid command name
+Saving file /Users/henriqueherrmann/Documents/GO/*Messages*...
+Wrote /Users/henriqueherrmann/Documents/GO/*Messages*
+delete-backward-char: Text is read-only [5 times]
+(New file)
+Mark set
+Saving file /Users/henriqueherrmann/.emacs.d/init.el...
+Wrote /Users/henriqueherrmann/.emacs.d/init.el
+(No changes need to be saved) [2 times]
+ESC <mode-line> <down-mouse-1> is undefined
+(No changes need to be saved)
+Saving file /Users/henriqueherrmann/Documents/GO/*Messages*...

@@ -7,64 +7,52 @@ import (
        )
 
 func main(){
-     server(":8080")
+     mux := http.NewServeMux()
+
+     mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request){
+
+         fmt.Fprintln(w, "Servidor Online")
+     
+     })
+
+     mux.HandleFunc("/users", userHandler)
+
+     http.ListenAndServe(":8080", mux)
+
 }
 
 
-/*
-Inicia um servidor http
-*/
 
-func server(port string){
+func userHandler(w http.ResponseWriter, r *http.Request){
 
-     http.HandleFunc("/", func(w http.ResponseWriter,r *http.Request){
+     switch r.Method {
 
-     	
-	w.Header().Set("Content-Type", "application/json")
-	fmt.Fprintln(w, "Server Online")
+     	    case http.MethodGet:
 
+	    	 id := r.URL.Query().Get("userId")
 
-     })
+		 if id != "" {
+		    fmt.Fprintln(w, "Método GET em /users para o usuário %i", id)
+		 }
 
-     http.HandleFunc("/users", func(w http.ResponseWriter,r *http.Request){
-     			     
-        switch r.Method {
+		 fmt.Fprintln(w, "Método GET em /users")
+	    	 
+	    case http.MethodPost:
 
-	case "GET":
+	    	 fmt.Fprintln(w, "Método POST em /users")
 
-	     id := r.URL.Query().Get("userId")
-	     
-	     if id != nil {
-	     	fmt.Fprintln(w, "Método GET em /users com query de id")
-	     }
+	    case http.MethodPut:
 
-	     fmt.Fprintln(w, "Método GET em /users")
+	    	 fmt.Fprintln(w, "Método PUT em /users")
 
-	case "POST":
+	    case http.MethodDelete:
 
-	     fmt.Fprintln(w, "Método POST em /users")
+	    	 fmt.Fprintln(w, "Método DELETE em /users")
 
-	case "PUT":
-
-             fmt.Fprintln(w, "Método PUT  em /users")
-
-	case "DELETE":
-
-	     id := r.URL.Query().Get("userId")
-
-	     if id == nil {
-	     	http.Error(w, "Parametro id é obrigatório", http.StatusBadRequest)
-		return
-	     }
-	     
-	     fmt.Fprintln(w, "Método DELETE em /users")
-
-	}
-
-     })
-	
-     http.ListenAndServe(port, nil)
+     }     
 }
+
+/*-------------------------------------------------------------------------*/
 
 
 
