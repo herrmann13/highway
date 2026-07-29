@@ -4,9 +4,11 @@ import (
        "fmt"
        "net/http"
        "encoding/json"
+       "strings"
        )
 
 func main(){
+     port := ":8080"
      mux := http.NewServeMux()
 
      mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request){
@@ -17,7 +19,12 @@ func main(){
 
      mux.HandleFunc("/users", userHandler)
 
-     http.ListenAndServe(":8080", mux)
+     formatedPort := strings.ReplaceAll(port, ":","")
+     
+     fmt.Println("Rodando servidor na porta", formatedPort)
+     
+     http.ListenAndServe(port, mux)
+     
 
 }
 
