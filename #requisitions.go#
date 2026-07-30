@@ -38,7 +38,10 @@ func main(){
 	enviar
 	))
      
+     w.Resize(fyne.NewSize(500,400))
+     w.ShowAndrun
 }
+
 
 func sendRequest(method string, url string, body string){
 
