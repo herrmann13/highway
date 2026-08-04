@@ -12,31 +12,66 @@ import(
 
 func main(){
 
-     a := app.New() //instancia uma nova aplicação
+     a := app.NewWithID("com.herrmann.requisitions") //instancia uma nova aplicação com um id
 
      /*Cria uma nova janela a partir da aplicação instanciada*/
      w := a.NewWindow("Requisição HTTP") 
      
      /*Novas variáveis serão populadas por entradas do widget*/
-     
-     method := widget.NewEntry()
+
+
      url := widget.NewEntry()
-     body := widget.NewMultilineEntry()
+     urlItem :=  widget.NewFormItem("URL", url)
+
+     body := widget.NewMultiLineEntry()
+     body.SetText("{}")
+     bodyItem := widget.NewFormItem("Body", body)
+     
+     method := widget.NewSelect(
+     	    []string{"GET","POST","PUT","PATCH","DELETE"},
+	    func(value string) {
+	    	       fmt.Println("Método selecionado:", value)
+		       if value == "GET" || value == "DELETE" {
+		       	  body.Hide()
+		       } else {
+		       	  body.Show()
+		       }	       
+	    },
+     )
+     method.SetSelected("GET")
+     methodItem := widget.NewFormItem("Método", method)
+
+     authorizationContent := widget.NewMultiLineEntry()
+     authorization := widget.NewSelect(
+     	    []string{"No Auth","Bearer Token", "OAuth 2.0", "Basic Auth"},
+	    func(value string) {
+	    	       fmt.Println("Autorizacao selecionada:", value)
+		       if value == "Bearer Token" || value == "Basic Auth"{
+		       	  authorizationContent.Show()
+		       } else {
+		          authorizationContent.Hide()
+		       }
+	    },
+     )
+     authorizationItem := widget.NewFormItem("Authorization", authorization)
+
+     authorization.SetSelected("No Auth")
 
      form := widget.NewForm(
-     	  widget.NewFormItem("Método", method)
-	  widget.NewFormItem("URL", url)
-	  widget.NewFormItem("Body", body)
+     	  methodItem,
+	  urlItem,
+	  authorizationItem,
+	  bodyItem,
      )
 
-     sendButton :=widget.NewButton("Enviar", sendRequest(method,
-						     url,
-						     body)
-						     )
+     sendButton := widget.NewButton("Enviar", func() {sendRequest(method.Selected, url.Text, body.Text)} )
+     
      w.SetContent(container.NewVBox(
 	form,
-	enviar
+	sendButton,
 	))
+
+     w.ShowAndRun()
      
 }
 
@@ -54,6 +89,8 @@ func sendRequest(method string, url string, body string){
      
      req.Header.Set("Content-Type", "application/json")
      req.Header.Set("Authorization", "Bearer token")
+
+     client := &http.Client{}
 
      resp, err := client.Do(req)
 
