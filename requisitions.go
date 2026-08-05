@@ -5,6 +5,7 @@ import(
 	"fmt"
 	"bytes"
 
+	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/widget"
@@ -19,10 +20,8 @@ func main(){
      
      url := widget.NewEntry()
      
-
      body := widget.NewMultiLineEntry()
      body.SetText("{}")
-     
      
      method := widget.NewSelect(
      	    []string{"GET","POST","PUT","PATCH","DELETE"},
@@ -58,20 +57,27 @@ func main(){
      			    authorization,
 			    authorizationContent)
 
-
-
-     form := widget.NewForm(
-     	  methodItem,
-	  urlItem,
-	  authorizationItem,
-	  bodyItem,
-     )
+     requisitionLayout := container.NewVBox(
+     		       method,
+		       url,
+		       body,
+		       authorizationContainer,)
+		       
 
      sendButton := widget.NewButton("Enviar", func() {sendRequest(method.Selected, url.Text, body.Text)} )
+
+     top := fyne.CanvasObject(nil)
+     bottom := sendButton
+     left := fyne.CanvasObject(nil)
+     right := fyne.CanvasObject(nil)
+     center := requisitionLayout
      
-     w.SetContent(container.NewVBox(
-	form,
-	sendButton,
+     w.SetContent(container.NewBorder(
+	top,
+	bottom,
+	left,
+	right,
+	center,
 	))
 
      w.ShowAndRun()
