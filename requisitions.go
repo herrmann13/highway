@@ -17,45 +17,53 @@ func main(){
      /*Cria uma nova janela a partir da aplicação instanciada*/
      w := a.NewWindow("Requisição HTTP") 
      
-     /*Novas variáveis serão populadas por entradas do widget*/
-
-
      url := widget.NewEntry()
-     urlItem :=  widget.NewFormItem("URL", url)
+     
 
      body := widget.NewMultiLineEntry()
      body.SetText("{}")
-     bodyItem := widget.NewFormItem("Body", body)
+     
      
      method := widget.NewSelect(
      	    []string{"GET","POST","PUT","PATCH","DELETE"},
 	    func(value string) {
 	    	       fmt.Println("Método selecionado:", value)
 		       if value == "GET" || value == "DELETE" {
-		       	  body.Hide()
+		       	  body.Disable()
 		       } else {
-		       	  body.Show()
+		       	  body.Enable()
 		       }	       
 	    },
      )
      method.SetSelected("GET")
-     methodItem := widget.NewFormItem("Método", method)
-
+		
      authorizationContent := widget.NewMultiLineEntry()
+     authorizationContent.SetMinRowsVisible(1)
+     
      authorization := widget.NewSelect(
      	    []string{"No Auth","Bearer Token", "OAuth 2.0", "Basic Auth"},
 	    func(value string) {
 	    	       fmt.Println("Autorizacao selecionada:", value)
 		       if value == "Bearer Token" || value == "Basic Auth"{
-		       	  authorizationContent.Show()
+		       	  authorizationContent.Enable()
 		       } else {
-		          authorizationContent.Hide()
+		          authorizationContent.Disable()
 		       }
 	    },
      )
-     authorizationItem := widget.NewFormItem("Authorization", authorization)
-
      authorization.SetSelected("No Auth")
+
+     urlItem :=  widget.NewFormItem("URL", url)
+     bodyItem := widget.NewFormItem("Body", body)
+     methodItem := widget.NewFormItem("Método", method)
+
+     authorizationContainer := container.NewHBox(
+     			    authorization,
+			    authorizationContent)
+
+     authorizationItem := widget.NewFormItem(
+     		       "Authorization",
+		       authorizationContainer)
 
      form := widget.NewForm(
      	  methodItem,
