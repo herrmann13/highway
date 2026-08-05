@@ -53,17 +53,12 @@ func main(){
      )
      authorization.SetSelected("No Auth")
 
-     urlItem :=  widget.NewFormItem("URL", url)
-     bodyItem := widget.NewFormItem("Body", body)
-     methodItem := widget.NewFormItem("Método", method)
 
      authorizationContainer := container.NewHBox(
      			    authorization,
 			    authorizationContent)
 
-     authorizationItem := widget.NewFormItem(
-     		       "Authorization",
-		       authorizationContainer)
+
 
      form := widget.NewForm(
      	  methodItem,
