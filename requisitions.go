@@ -16,6 +16,7 @@ func main(){
      a := app.NewWithID("com.herrmann.requisitions") //instancia uma nova aplicação com um id
 
      /*Cria uma nova janela a partir da aplicação instanciada*/
+     
      w := a.NewWindow("Requisição HTTP") 
      
      url := widget.NewEntry()
@@ -67,15 +68,50 @@ func main(){
 	authorizationContent,
 	)
 
+     headerItems := []string{}
+     headerEntry := widget.NewEntry()
+     headerEntry.SetPlaceHolder("Content-Type: application/json")
+     headers := widget.NewList(
+     	     func() int {
+	     	    return len(headerItems)
+	     },
+	     func() fyne.CanvasObject{
+	     	    return widget.NewLabel("")
+	     },
+	     func(id widget.ListItemID, obj fyne.CanvasObject){
+	     	     obj.(*widget.Label).SetText(headerItems[id])
+	     },
+     	     )
+	   
+     addHeaderButton := widget.NewButton("Adicionar Header",
+     		     			 func() {
+					 	headerItems = append(
+							headerItems,
+							headerEntry.Text,
+							)
+						headers.Refresh()
+						})
+     headersContainer := container.NewVBox(
+      		      headers,
+		      headerEntry,
+		      addHeaderButton,
+     		      )
+		     
+
      requisitionLayout := container.NewVBox(
      		       method,
+		       headersContainer,
 		       url,
 		       body,
 		       authorizationContainer,)
 		       
 
-     sendButton := widget.NewButton("Enviar", func() {sendRequest(method.Selected, url.Text, body.Text)} )
-
+     sendButton := widget.NewButton("Enviar",
+				     func() {sendRequest(method.Selected,
+						     	 url.Text,
+						     	 body.Text,
+					                 )})
+				
      top := fyne.CanvasObject(nil)
      bottom := sendButton
      left := fyne.CanvasObject(nil)
