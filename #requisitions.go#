@@ -77,6 +77,7 @@ func main(){
      		     			 func() {
 					       header := headerEntry.Text
 					       var headerItem *fyne.Container
+					       
 					       headerItem = container.NewHBox(
      						     widget.NewLabel(header),
 						     widget.NewButton("Remover", func(){
