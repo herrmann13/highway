@@ -19,6 +19,7 @@ func main(){
      w := a.NewWindow("Requisição HTTP") 
      
      url := widget.NewEntry()
+     url.SetPlaceHolder("URL")
      
      body := widget.NewMultiLineEntry()
      body.SetText("{}")
@@ -38,6 +39,7 @@ func main(){
 		
      authorizationContent := widget.NewMultiLineEntry()
      authorizationContent.SetMinRowsVisible(1)
+     authorizationContent.SetPlaceHolder("Auth Content")
      
      authorization := widget.NewSelect(
      	    []string{"No Auth","Bearer Token", "OAuth 2.0", "Basic Auth"},
@@ -45,6 +47,11 @@ func main(){
 	    	       fmt.Println("Autorizacao selecionada:", value)
 		       if value == "Bearer Token" || value == "Basic Auth"{
 		       	  authorizationContent.Enable()
+			  
+			  if value =="Basic Auth"{
+			     authorizationContent.SetPlaceHolder("{user:password}")
+			  }
+			  
 		       } else {
 		          authorizationContent.Disable()
 		       }
@@ -52,10 +59,13 @@ func main(){
      )
      authorization.SetSelected("No Auth")
 
-
-     authorizationContainer := container.NewHBox(
-     			    authorization,
-			    authorizationContent)
+     authorizationContainer := container.NewBorder(
+	nil,
+	nil,
+	authorization,
+	nil,
+	authorizationContent,
+	)
 
      requisitionLayout := container.NewVBox(
      		       method,
