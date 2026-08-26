@@ -1,4 +1,5 @@
 package main
+
 import(
 	"net/http"
 	"fmt"
@@ -163,5 +164,4 @@ func sendRequest(method string, url string, body string){
      fmt.Println(resp)
 
      defer resp.Body.Close()
-     
 }
