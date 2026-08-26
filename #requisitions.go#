@@ -1,5 +1,4 @@
 package main
-
 import(
 	"net/http"
 	"fmt"
@@ -16,25 +15,26 @@ func main(){
 
      /*Cria uma nova janela a partir da aplicação instanciada*/
      
-     w := a.NewWindow("Requisição HTTP") 
+	w := a.NewWindow("Requisição HTTP")
+	
      
-     url := widget.NewEntry()
-     url.SetPlaceHolder("https://localhost:3000")
+	url := widget.NewEntry()
+	url.SetPlaceHolder("https://localhost:3000")
      
-     body := widget.NewMultiLineEntry()
-     body.SetText("{}")
-     
-     method := widget.NewSelect(
-     	    []string{"GET","POST","PUT","PATCH","DELETE"},
+	body := widget.NewMultiLineEntry()
+	body.SetText("{}")
+
+	method := widget.NewSelect(
+     	[]string{"GET","POST","PUT","PATCH","DELETE"},
 	    func(value string) {
-	    	       fmt.Println("Método selecionado:", value)
-		       if value == "GET" || value == "DELETE" {
-		       	  body.Disable()
-		       } else {
-		       	  body.Enable()
-		       }	       
+	    	fmt.Println("Método selecionado:", value)
+		    if value == "GET" || value == "DELETE" {
+		       	body.Disable()
+		    } else {
+		       	body.Enable()
+		    }	       
 	    },
-     )
+    )
      method.SetSelected("GET")
 		
      authorizationContent := widget.NewMultiLineEntry()
@@ -164,4 +164,5 @@ func sendRequest(method string, url string, body string){
      fmt.Println(resp)
 
      defer resp.Body.Close()
+     
 }
