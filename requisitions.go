@@ -44,10 +44,7 @@ type responseResult struct {
 	duration   time.Duration
 }
 
-const (
-	maxResponseBytes   = 50 * 1024 * 1024
-	maxPrettyJSONBytes = 512 * 1024
-)
+const maxResponseBytes = 50 * 1024 * 1024
 
 type authConfig struct {
 	AuthType              string `json:"authType"`
@@ -455,11 +452,14 @@ func main() {
 				}
 				label := box.Objects[0].(*renameLabel)
 				btn := box.Objects[2].(*widget.Button)
-				colName := strings.TrimPrefix(uid, "col:")
-				label.SetText(colName)
+				c, _, ok := collectionForUID(collections, uid)
+				if !ok {
+					return
+				}
+				label.SetText(c.Name)
 				label.onTapped = func() { tree.Select(uid) }
-				label.onDoubleTapped = func() { renameCollectionFlow(colName) }
-				btn.OnTapped = func() { showCollectionMenu(btn, colName) }
+				label.onDoubleTapped = func() { renameCollectionFlow(c.Name) }
+				btn.OnTapped = func() { showCollectionMenu(btn, c.Name) }
 				return
 			}
 			box, ok := node.(*fyne.Container)
@@ -469,92 +469,43 @@ func main() {
 			icon := box.Objects[0].(*widget.Icon)
 			label := box.Objects[1].(*renameLabel)
 			deleteButton := box.Objects[3].(*widget.Button)
-			rest := strings.TrimPrefix(uid, "req:")
-			requestType := requestTypeHTTP
-			if idx := strings.LastIndex(rest, "/"); idx >= 0 {
-				label.SetText(rest[idx+1:])
-				for _, c := range collections {
-					if c.Name != rest[:idx] {
-						continue
-					}
-					for _, r := range c.Requests {
-						if r.Name == rest[idx+1:] {
-							requestType = r.Type
-							break
-						}
-					}
-					break
-				}
-			} else {
-				label.SetText(rest)
+			c, request, ok := requestForUID(collections, uid)
+			if !ok {
+				return
 			}
-			icon.SetResource(requestTypeIcon(requestType))
+			label.SetText(request.Name)
+			icon.SetResource(requestTypeIcon(request.Type))
 			label.onTapped = func() { tree.Select(uid) }
 			label.onDoubleTapped = func() {
-				idx := strings.LastIndex(rest, "/")
-				if idx < 0 {
-					return
-				}
-				colName := rest[:idx]
-				reqName := rest[idx+1:]
 				for _, rt := range tabIndex {
-					if rt.collectionName == colName && rt.name == reqName {
+					if rt.collectionName == c.Name && rt.name == request.Name {
 						renameRequest(rt)
 						return
 					}
 				}
-				for _, c := range collections {
-					if c.Name != colName {
-						continue
-					}
-					for _, r := range c.Requests {
-						if r.Name != reqName {
-							continue
-						}
-						rd := r
-						openTab(&rd, colName)
-						renameRequest(tabIndex[tabs.Selected()])
-						return
-					}
-				}
+				rd := *request
+				openTab(&rd, c.Name)
+				renameRequest(tabIndex[tabs.Selected()])
 			}
 			deleteButton.OnTapped = func() {
-				idx := strings.LastIndex(rest, "/")
-				if idx >= 0 {
-					deleteRequestFlow(rest[:idx], rest[idx+1:])
-				}
+				deleteRequestFlow(c.Name, request.Name)
 			}
 		},
 	)
 	tree.OpenAllBranches()
 
 	tree.OnSelected = func(uid string) {
-		if strings.HasPrefix(uid, "col:") {
-			selectedCollection = strings.TrimPrefix(uid, "col:")
+		if c, _, ok := collectionForUID(collections, uid); ok {
+			selectedCollection = c.Name
 			return
 		}
-		if !strings.HasPrefix(uid, "req:") {
+		c, request, ok := requestForUID(collections, uid)
+		if !ok {
 			return
 		}
-		rest := strings.TrimPrefix(uid, "req:")
-		idx := strings.LastIndex(rest, "/")
-		if idx < 0 {
-			return
-		}
-		colName := rest[:idx]
-		selectedCollection = colName
-		reqName := rest[idx+1:]
-		for _, c := range collections {
-			if c.Name != colName {
-				continue
-			}
-			for _, r := range c.Requests {
-				if r.Name == reqName {
-					rd := r
-					openTab(&rd, colName)
-				}
-			}
-		}
+		selectedCollection = c.Name
+		rd := *request
+		openTab(&rd, c.Name)
 	}
 
 	tabs.CreateTab = func() *container.TabItem { return addTab(nil, "") }
@@ -693,25 +644,57 @@ func main() {
 func treeChildUIDs(uid string, collections []*collection) []string {
 	if uid == "" {
 		ids := make([]string, 0, len(collections))
-		for _, c := range collections {
-			ids = append(ids, "col:"+c.Name)
+		for i := range collections {
+			ids = append(ids, collectionUID(i))
 		}
 		return ids
 	}
-	if strings.HasPrefix(uid, "col:") {
-		name := strings.TrimPrefix(uid, "col:")
-		for _, c := range collections {
-			if c.Name != name {
-				continue
-			}
-			ids := make([]string, 0, len(c.Requests))
-			for _, r := range c.Requests {
-				ids = append(ids, "req:"+name+"/"+r.Name)
-			}
-			return ids
+	if c, collectionIndex, ok := collectionForUID(collections, uid); ok {
+		ids := make([]string, 0, len(c.Requests))
+		for i := range c.Requests {
+			ids = append(ids, requestUID(collectionIndex, i))
 		}
+		return ids
 	}
 	return nil
+}
+
+func collectionUID(index int) string {
+	return "col:" + strconv.Itoa(index)
+}
+
+func requestUID(collectionIndex, requestIndex int) string {
+	return "req:" + strconv.Itoa(collectionIndex) + ":" + strconv.Itoa(requestIndex)
+}
+
+func collectionForUID(collections []*collection, uid string) (*collection, int, bool) {
+	if !strings.HasPrefix(uid, "col:") {
+		return nil, 0, false
+	}
+	index, err := strconv.Atoi(strings.TrimPrefix(uid, "col:"))
+	if err != nil || index < 0 || index >= len(collections) {
+		return nil, 0, false
+	}
+	return collections[index], index, true
+}
+
+func requestForUID(collections []*collection, uid string) (*collection, *requestData, bool) {
+	if !strings.HasPrefix(uid, "req:") {
+		return nil, nil, false
+	}
+	parts := strings.Split(strings.TrimPrefix(uid, "req:"), ":")
+	if len(parts) != 2 {
+		return nil, nil, false
+	}
+	collectionIndex, err := strconv.Atoi(parts[0])
+	if err != nil || collectionIndex < 0 || collectionIndex >= len(collections) {
+		return nil, nil, false
+	}
+	requestIndex, err := strconv.Atoi(parts[1])
+	if err != nil || requestIndex < 0 || requestIndex >= len(collections[collectionIndex].Requests) {
+		return nil, nil, false
+	}
+	return collections[collectionIndex], &collections[collectionIndex].Requests[requestIndex], true
 }
 
 func sectionPanel(title string, accent, bg color.Color, content fyne.CanvasObject) *fyne.Container {
@@ -730,11 +713,11 @@ func sectionPanel(title string, accent, bg color.Color, content fyne.CanvasObjec
 	)
 }
 
-func showError(statusText *canvas.Text, responseBody, responseHeaders *widget.Entry, err error) {
+func showError(statusText *canvas.Text, responseBody *responseViewer, responseHeaders *widget.Entry, err error) {
 	statusText.Text = "Erro: " + err.Error()
 	statusText.Color = errorColor()
 	statusText.Refresh()
-	responseBody.SetText("")
+	responseBody.clear()
 	responseHeaders.SetText("")
 }
 
@@ -950,16 +933,17 @@ func sendRequest(method, rawURL string, params, headers [][2]string, reqBody io.
 	result.statusCode = resp.StatusCode
 	result.duration = time.Since(start)
 	result.headers = resp.Header
-	result.body = string(respBody)
-
-	if len(respBody) <= maxPrettyJSONBytes && strings.Contains(resp.Header.Get("Content-Type"), "application/json") {
-		var pretty bytes.Buffer
-		if err := json.Indent(&pretty, respBody, "", "  "); err == nil {
-			result.body = pretty.String()
-		}
-	}
+	result.body = formatResponseBody(respBody)
 
 	return result, nil
+}
+
+func formatResponseBody(body []byte) string {
+	var pretty bytes.Buffer
+	if json.Indent(&pretty, body, "", "  ") == nil {
+		return pretty.String()
+	}
+	return string(body)
 }
 
 func applyAuth(req *http.Request, cfg authConfig) error {

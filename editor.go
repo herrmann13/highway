@@ -405,7 +405,6 @@ type requestTab struct {
 	nameLabel      *renameLabel
 	editor         *requestEditor
 	status         *canvas.Text
-	respBody       *widget.Entry
 	respHeaders    *widget.Entry
 	responseViewer *responseViewer
 	content        *fyne.Container
@@ -461,11 +460,9 @@ func newRequestTab(w fyne.Window, rd *requestData, collectionName string, sync f
 	rt.status = status
 
 	responseViewer := newResponseViewer()
-	respBody := responseViewer.entry
 	respHeaders := widget.NewMultiLineEntry()
 	respHeaders.SetPlaceHolder("Headers da resposta")
 	respHeaders.Disable()
-	rt.respBody = respBody
 	rt.respHeaders = respHeaders
 	rt.responseViewer = responseViewer
 
@@ -475,7 +472,7 @@ func newRequestTab(w fyne.Window, rd *requestData, collectionName string, sync f
 	statusRow := container.NewHBox(status, layout.NewSpacer(), copyButton)
 
 	responseTabs := container.NewAppTabs(
-		container.NewTabItem("Body", container.NewBorder(responseViewer.controls, nil, nil, nil, respBody)),
+		container.NewTabItem("Body", responseViewer.list),
 		container.NewTabItem("Headers", respHeaders),
 	)
 
@@ -488,8 +485,7 @@ func newRequestTab(w fyne.Window, rd *requestData, collectionName string, sync f
 		var err error
 		s, err = expandRequestSnapshot(s, variables)
 		if err != nil {
-			responseViewer.clear()
-			showError(status, respBody, respHeaders, err)
+			showError(status, responseViewer, respHeaders, err)
 			return
 		}
 		responseViewer.clear()
@@ -501,16 +497,18 @@ func newRequestTab(w fyne.Window, rd *requestData, collectionName string, sync f
 			reqBody, contentType, err := buildBody(s.bodyType, s.rawBody, s.form, s.multipart)
 			if err != nil {
 				fyne.Do(func() {
-					responseViewer.clear()
-					showError(status, respBody, respHeaders, err)
+					showError(status, responseViewer, respHeaders, err)
 				})
 				return
 			}
 			result, err := sendRequest(s.method, s.url, s.queryParams, s.headers, reqBody, contentType, s.auth)
+			var bodyLines []string
+			if err == nil {
+				bodyLines = responseLines(result.body)
+			}
 			fyne.Do(func() {
 				if err != nil {
-					responseViewer.clear()
-					showError(status, respBody, respHeaders, err)
+					showError(status, responseViewer, respHeaders, err)
 					return
 				}
 				status.Text = fmt.Sprintf(
@@ -521,7 +519,7 @@ func newRequestTab(w fyne.Window, rd *requestData, collectionName string, sync f
 				)
 				status.Color = statusColor(result.statusCode)
 				status.Refresh()
-				responseViewer.setResponse(result.body)
+				responseViewer.setResponse(result.body, bodyLines)
 				respHeaders.SetText(formatHeaders(result.headers))
 			})
 		}()
@@ -534,7 +532,7 @@ func newRequestTab(w fyne.Window, rd *requestData, collectionName string, sync f
 		"Resposta",
 		color.RGBA{R: 0x81, G: 0xc7, B: 0x84, A: 0xff},
 		theme.BackgroundColor(),
-		container.NewVBox(statusRow, responseTabs),
+		container.NewBorder(statusRow, nil, nil, nil, responseTabs),
 	)
 
 	split := container.NewVSplit(requestPanel, responsePanel)
