@@ -202,7 +202,7 @@ func main() {
 						return
 					}
 					name := strings.TrimSpace(nameEntry.Text)
-					rd := requestData{Name: name}
+					rd := requestData{Name: name, Type: requestTypeHTTP}
 					c.Requests = append(c.Requests, rd)
 					if err := saveCollection(c); err != nil {
 						dialog.ShowInformation("Erro", err.Error(), w)
@@ -307,6 +307,40 @@ func main() {
 		})
 	}
 
+	deleteRequestFlow := func(colName, reqName string) {
+		dialog.ShowConfirm("Excluir requisição", "Excluir a requisição \""+reqName+"\"?", func(ok bool) {
+			if !ok {
+				return
+			}
+			for _, c := range collections {
+				if c.Name != colName {
+					continue
+				}
+				for i, request := range c.Requests {
+					if request.Name != reqName {
+						continue
+					}
+					c.Requests = append(c.Requests[:i], c.Requests[i+1:]...)
+					if err := saveCollection(c); err != nil {
+						c.Requests = append(c.Requests, request)
+						copy(c.Requests[i+1:], c.Requests[i:len(c.Requests)-1])
+						c.Requests[i] = request
+						dialog.ShowInformation("Erro", err.Error(), w)
+						return
+					}
+					for item, rt := range tabIndex {
+						if rt.collectionName == colName && rt.name == reqName {
+							tabs.Remove(item)
+							delete(tabIndex, item)
+						}
+					}
+					tree.Refresh()
+					return
+				}
+			}
+		}, w)
+	}
+
 	deleteCollectionFlow := func(colName string) {
 		dialog.ShowConfirm("Excluir", "Excluir a coleção \""+colName+"\"?", func(ok bool) {
 			if !ok {
@@ -358,7 +392,12 @@ func main() {
 					widget.NewButton("⋯", nil),
 				)
 			}
-			return newRenameLabel()
+			return container.NewHBox(
+				widget.NewIcon(requestTypeIcon(requestTypeHTTP)),
+				newRenameLabel(),
+				layout.NewSpacer(),
+				widget.NewButtonWithIcon("", theme.CancelIcon(), nil),
+			)
 		},
 		func(uid string, branch bool, node fyne.CanvasObject) {
 			if branch {
@@ -375,16 +414,33 @@ func main() {
 				btn.OnTapped = func() { showCollectionMenu(btn, colName) }
 				return
 			}
-			label, ok := node.(*renameLabel)
-			if !ok {
+			box, ok := node.(*fyne.Container)
+			if !ok || len(box.Objects) < 4 {
 				return
 			}
+			icon := box.Objects[0].(*widget.Icon)
+			label := box.Objects[1].(*renameLabel)
+			deleteButton := box.Objects[3].(*widget.Button)
 			rest := strings.TrimPrefix(uid, "req:")
+			requestType := requestTypeHTTP
 			if idx := strings.LastIndex(rest, "/"); idx >= 0 {
 				label.SetText(rest[idx+1:])
+				for _, c := range collections {
+					if c.Name != rest[:idx] {
+						continue
+					}
+					for _, r := range c.Requests {
+						if r.Name == rest[idx+1:] {
+							requestType = r.Type
+							break
+						}
+					}
+					break
+				}
 			} else {
 				label.SetText(rest)
 			}
+			icon.SetResource(requestTypeIcon(requestType))
 			label.onTapped = func() { tree.Select(uid) }
 			label.onDoubleTapped = func() {
 				idx := strings.LastIndex(rest, "/")
@@ -412,6 +468,12 @@ func main() {
 						renameRequest(tabIndex[tabs.Selected()])
 						return
 					}
+				}
+			}
+			deleteButton.OnTapped = func() {
+				idx := strings.LastIndex(rest, "/")
+				if idx >= 0 {
+					deleteRequestFlow(rest[:idx], rest[idx+1:])
 				}
 			}
 		},
@@ -453,18 +515,41 @@ func main() {
 	}
 
 	newCollectionButton := widget.NewButton("Nova Coleção", func() {
-		d := dialog.NewEntryDialog("Nova coleção", "Nome da coleção:", func(name string) {
-			if strings.TrimSpace(name) == "" {
-				return
+		nameEntry := widget.NewEntry()
+		nameEntry.SetPlaceHolder("Ex.: API de usuários")
+		nameEntry.Validator = func(name string) error {
+			name = strings.TrimSpace(name)
+			if name == "" {
+				return fmt.Errorf("informe o nome da coleção")
 			}
-			c := &collection{Name: name}
-			if err := saveCollection(c); err != nil {
-				dialog.ShowInformation("Erro", err.Error(), w)
-				return
+			for _, c := range collections {
+				if c.Name == name {
+					return fmt.Errorf("já existe uma coleção com o nome %q", name)
+				}
 			}
-			collections = append(collections, c)
-			tree.Refresh()
-		}, w)
+			return nil
+		}
+
+		d := dialog.NewForm(
+			"Nova coleção",
+			"Criar",
+			"Cancelar",
+			[]*widget.FormItem{widget.NewFormItem("Nome da coleção", nameEntry)},
+			func(ok bool) {
+				if !ok {
+					return
+				}
+				c := &collection{Name: strings.TrimSpace(nameEntry.Text)}
+				if err := saveCollection(c); err != nil {
+					dialog.ShowInformation("Erro", err.Error(), w)
+					return
+				}
+				collections = append(collections, c)
+				tree.Refresh()
+			},
+			w,
+		)
+		d.Resize(fyne.NewSize(520, 180))
 		d.Show()
 	})
 

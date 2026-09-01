@@ -11,6 +11,7 @@ import (
 
 type requestData struct {
 	Name      string      `json:"name"`
+	Type      string      `json:"type"`
 	Method    string      `json:"method"`
 	URL       string      `json:"url"`
 	BodyType  string      `json:"bodyType"`

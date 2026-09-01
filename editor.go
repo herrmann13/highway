@@ -27,6 +27,7 @@ type requestSnapshot struct {
 }
 
 type requestEditor struct {
+	requestType      string
 	method           *widget.Select
 	urlEntry         *widget.Entry
 	bodyType         *widget.Select
@@ -67,7 +68,10 @@ type requestEditor struct {
 }
 
 func newRequestEditor(rd *requestData, onEdit func()) *requestEditor {
-	e := &requestEditor{}
+	e := &requestEditor{requestType: requestTypeHTTP}
+	if rd != nil {
+		e.requestType = normalizedRequestType(rd.Type)
+	}
 
 	e.urlEntry = widget.NewEntry()
 	e.urlEntry.SetPlaceHolder("http://localhost:3000")
@@ -380,6 +384,7 @@ func (e *requestEditor) toData(name string) requestData {
 	s := e.snapshot()
 	return requestData{
 		Name:      name,
+		Type:      e.requestType,
 		Method:    s.method,
 		URL:       s.url,
 		BodyType:  s.bodyType,

@@ -15,7 +15,7 @@ func parseCurl(command string) (requestData, error) {
 		return requestData{}, fmt.Errorf("o comando deve começar com curl")
 	}
 
-	rd := requestData{Method: "GET", BodyType: "raw"}
+	rd := requestData{Type: requestTypeHTTP, Method: "GET", BodyType: "raw"}
 	var rawData []string
 	var encodedData []string
 	forceGet := false
