@@ -127,15 +127,43 @@ func main() {
 			if c.Name != colName {
 				continue
 			}
-			name := uniqueRequestName(c, "Nova Requisição")
-			rd := requestData{Name: name}
-			c.Requests = append(c.Requests, rd)
-			if err := saveCollection(c); err != nil {
-				dialog.ShowInformation("Erro", err.Error(), w)
-				return
+
+			nameEntry := widget.NewEntry()
+			nameEntry.SetPlaceHolder("Ex.: Listar usuários")
+			nameEntry.Validator = func(name string) error {
+				name = strings.TrimSpace(name)
+				if name == "" {
+					return fmt.Errorf("informe o nome da requisição")
+				}
+				if requestNameExists(c, name, -1) {
+					return fmt.Errorf("já existe uma requisição com o nome %q", name)
+				}
+				return nil
 			}
-			openTab(&rd, colName)
-			tree.Refresh()
+
+			d := dialog.NewForm(
+				"Nova requisição",
+				"Criar",
+				"Cancelar",
+				[]*widget.FormItem{widget.NewFormItem("Nome da requisição", nameEntry)},
+				func(ok bool) {
+					if !ok {
+						return
+					}
+					name := strings.TrimSpace(nameEntry.Text)
+					rd := requestData{Name: name}
+					c.Requests = append(c.Requests, rd)
+					if err := saveCollection(c); err != nil {
+						dialog.ShowInformation("Erro", err.Error(), w)
+						return
+					}
+					openTab(&rd, colName)
+					tree.Refresh()
+				},
+				w,
+			)
+			d.Resize(fyne.NewSize(520, 180))
+			d.Show()
 			return
 		}
 	}
