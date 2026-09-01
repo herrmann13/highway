@@ -5,13 +5,16 @@ ICON_SVG := assets/highway.svg
 ICON_PNG := assets/highway.png
 FYNE := go run fyne.io/tools/cmd/fyne@latest
 
-.PHONY: macos linux icon clean test
+.PHONY: macos macos-service linux icon clean test
 
 macos: icon
 	mkdir -p $(DIST)
 	rm -rf $(DIST)/$(APP).app $(APP).app
 	$(FYNE) package -os darwin -name $(APP) -appID $(APP_ID) -icon $(ICON_PNG)
 	mv $(APP).app $(DIST)/$(APP).app
+
+macos-service:
+	zsh packaging/macos/install-service.sh
 
 linux: icon
 	@if [ "$$(go env GOOS)" != "linux" ] || [ "$$(go env GOARCH)" != "amd64" ]; then \

@@ -31,15 +31,28 @@ type collection struct {
 
 var invalidFileChars = regexp.MustCompile(`[^a-zA-Z0-9._-]+`)
 
-func collectionsDir() (string, error) {
+func highwayConfigDir() (string, error) {
 	base, err := os.UserConfigDir()
 	if err != nil {
 		return "", err
 	}
-	dir := filepath.Join(base, "highway", "collections")
+	dir := filepath.Join(base, "highway")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return "", err
 	}
+	return dir, nil
+}
+
+func collectionsDir() (string, error) {
+	configDir, err := highwayConfigDir()
+	if err != nil {
+		return "", err
+	}
+	dir := filepath.Join(configDir, "collections")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return "", err
+	}
+	base := filepath.Dir(configDir)
 	if err := migrateCollections(filepath.Join(base, "carteiro", "collections"), dir); err != nil {
 		return "", err
 	}

@@ -16,6 +16,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/url"
+	"os"
 	"sort"
 	"strconv"
 	"strings"
@@ -123,6 +124,38 @@ func showRenameDialog(w fyne.Window, title, current string, validate func(string
 }
 
 func main() {
+	pendingImport, handled, err := importFileFromArgs(os.Args[1:])
+	if handled {
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return
+		}
+		runHighway(pendingImport)
+		return
+	}
+	pendingImport, handled, err = importCommandFromArgs(os.Args[1:], os.Stdin)
+	if handled {
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return
+		}
+		delivered, err := sendImportCommand(pendingImport)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "erro ao enviar importação para o Highway:", err)
+			return
+		}
+		if delivered {
+			return
+		}
+		if err := launchHighwayWithImport(pendingImport); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+		}
+		return
+	}
+	runHighway(pendingImport)
+}
+
+func runHighway(pendingImport string) {
 	a := app.NewWithID("com.herrmann.highway")
 	a.Settings().SetTheme(theme.DarkTheme())
 	w := a.NewWindow("Highway")
@@ -678,6 +711,19 @@ func main() {
 
 	w.SetContent(split)
 	w.Resize(fyne.NewSize(1200, 750))
+	closeImportServer, err := startImportServer(func(command string) {
+		fyne.Do(func() {
+			w.Show()
+			w.RequestFocus()
+			showCurlImportDialog(command)
+		})
+	})
+	if err == nil {
+		defer closeImportServer()
+	}
+	if pendingImport != "" {
+		fyne.Do(func() { showCurlImportDialog(pendingImport) })
+	}
 	w.ShowAndRun()
 }
 

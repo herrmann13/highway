@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>AMApplicationBuild</key>
+  <string>523</string>
+  <key>AMApplicationVersion</key>
+  <string>2.10</string>
+  <key>AMDocumentVersion</key>
+  <string>2</string>
+  <key>actions</key>
+  <array>
+    <dict>
+      <key>action</key>
+      <dict>
+        <key>AMAcceptsInput</key>
+        <true/>
+        <key>AMActionVersion</key>
+        <string>2.0.2</string>
+        <key>AMApplication</key>
+        <array>
+          <string>Automator</string>
+        </array>
+        <key>AMBundleIdentifier</key>
+        <string>com.apple.RunShellScript</string>
+        <key>AMName</key>
+        <string>Run Shell Script</string>
+        <key>AMProvides</key>
+        <dict>
+          <key>Results</key>
+          <array>
+            <dict>
+              <key>Type</key>
+              <string>com.apple.cocoa.string</string>
+            </dict>
+          </array>
+        </dict>
+        <key>AMUUID</key>
+        <string>6F7545CD-776A-4A84-8D1B-7EE7DF70DDF4</string>
+        <key>InputMethod</key>
+        <integer>1</integer>
+        <key>Shell</key>
+        <string>/bin/zsh</string>
+        <key>Source</key>
+        <string>#!/bin/zsh
+set -eu
+highway="/Applications/Highway.app/Contents/MacOS/highway"
+if [[ ! -x "$highway" ]]; then
+  osascript -e 'display alert "Highway não encontrado" message "Instale Highway.app em /Applications antes de usar este serviço."'
+  exit 1
+fi
+input="$(cat)"
+if [[ -n "$input" ]]; then
+  printf '%s' "$input" | "$highway" import --curl-stdin &gt;/dev/null 2&gt;&amp;1
+fi</string>
+      </dict>
+      <key>isViewVisible</key>
+      <true/>
+    </dict>
+  </array>
+  <key>connectors</key>
+  <dict/>
+  <key>workflowMetaData</key>
+  <dict>
+    <key>serviceInputTypeIdentifier</key>
+    <string>com.apple.Automator.text</string>
+    <key>serviceOutputTypeIdentifier</key>
+    <string>com.apple.Automator.nothing</string>
+    <key>serviceProcessesInput</key>
+    <true/>
+    <key>workflowTypeIdentifier</key>
+    <string>com.apple.Automator.servicesMenu</string>
+  </dict>
+</dict>
+</plist>

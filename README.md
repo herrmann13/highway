@@ -12,6 +12,16 @@ make macos
 
 O app sera criado em `dist/Highway.app`. Arraste-o para `Aplicativos` ou abra-o diretamente. Como o build nao e assinado, o macOS pode exigir clicar com o botao direito e escolher `Abrir` na primeira execucao.
 
+### Abrir cURL selecionado no menu de contexto
+
+Depois de arrastar `Highway.app` para `/Applications`, instale o Service do macOS:
+
+```bash
+make macos-service
+```
+
+Selecione um comando `curl` em um aplicativo compativel, clique com o botao direito e escolha `Services > Abrir no Highway`. Se Highway ja estiver aberto, a janela existente ganhara foco; caso contrario, o app iniciara com o dialogo de importacao preenchido.
+
 ## Build local no Ubuntu/Debian x86_64
 
 Instale as dependencias graficas e de compilacao:
