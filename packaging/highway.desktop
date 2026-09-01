@@ -1,0 +1,9 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Highway
+Comment=Cliente HTTP para APIs
+Exec=highway
+Icon=highway
+Terminal=false
+Categories=Development;Network;
