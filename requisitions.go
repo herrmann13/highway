@@ -212,6 +212,15 @@ func runHighway(pendingImport string) {
 	}
 
 	openTab := func(rd *requestData, collectionName string) {
+		if rd != nil && collectionName != "" {
+			for item, rt := range tabIndex {
+				if requestTabMatches(rt, collectionName, rd.Name) {
+					tabs.Select(item)
+					w.RequestFocus()
+					return
+				}
+			}
+		}
 		item := addTab(rd, collectionName)
 		tabs.Append(item)
 		tabs.Select(item)
@@ -781,6 +790,10 @@ func requestForUID(collections []*collection, uid string) (*collection, *request
 		return nil, nil, false
 	}
 	return collections[collectionIndex], &collections[collectionIndex].Requests[requestIndex], true
+}
+
+func requestTabMatches(rt *requestTab, collectionName, requestName string) bool {
+	return rt != nil && rt.collectionName == collectionName && rt.name == requestName
 }
 
 func sectionPanel(title string, accent, bg color.Color, content fyne.CanvasObject) *fyne.Container {
