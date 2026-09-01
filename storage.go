@@ -24,8 +24,9 @@ type requestData struct {
 }
 
 type collection struct {
-	Name     string        `json:"name"`
-	Requests []requestData `json:"requests"`
+	Name      string        `json:"name"`
+	Variables [][2]string   `json:"variables"`
+	Requests  []requestData `json:"requests"`
 }
 
 var invalidFileChars = regexp.MustCompile(`[^a-zA-Z0-9._-]+`)

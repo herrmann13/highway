@@ -29,9 +29,9 @@ type requestSnapshot struct {
 type requestEditor struct {
 	requestType      string
 	method           *widget.Select
-	urlEntry         *widget.Entry
+	urlEntry         *variableEntry
 	bodyType         *widget.Select
-	rawBody          *widget.Entry
+	rawBody          *variableEntry
 	form             *[]kvPair
 	multipart        *[]kvPair
 	headers          *[]kvPair
@@ -40,24 +40,24 @@ type requestEditor struct {
 	multipartSection *fyne.Container
 
 	authorization         *widget.Select
-	authorizationContent  *widget.Entry
-	basicUserEntry        *widget.Entry
-	basicPassEntry        *widget.Entry
-	apiKeyNameEntry       *widget.Entry
-	apiKeyValueEntry      *widget.Entry
+	authorizationContent  *variableEntry
+	basicUserEntry        *variableEntry
+	basicPassEntry        *variableEntry
+	apiKeyNameEntry       *variableEntry
+	apiKeyValueEntry      *variableEntry
 	apiKeyLocation        *widget.Select
-	oauth1ConsumerKey     *widget.Entry
-	oauth1ConsumerSecret  *widget.Entry
-	oauth1AccessToken     *widget.Entry
-	oauth1TokenSecret     *widget.Entry
+	oauth1ConsumerKey     *variableEntry
+	oauth1ConsumerSecret  *variableEntry
+	oauth1AccessToken     *variableEntry
+	oauth1TokenSecret     *variableEntry
 	oauth1SignatureMethod *widget.Select
 	oauthGrantType        *widget.Select
-	oauthTokenURL         *widget.Entry
-	oauthClientID         *widget.Entry
-	oauthClientSecret     *widget.Entry
-	oauthUsername         *widget.Entry
-	oauthPassword         *widget.Entry
-	oauthScope            *widget.Entry
+	oauthTokenURL         *variableEntry
+	oauthClientID         *variableEntry
+	oauthClientSecret     *variableEntry
+	oauthUsername         *variableEntry
+	oauthPassword         *variableEntry
+	oauthScope            *variableEntry
 
 	basicForm  *widget.Form
 	apiKeyForm *widget.Form
@@ -67,16 +67,17 @@ type requestEditor struct {
 	tabs *container.AppTabs
 }
 
-func newRequestEditor(rd *requestData, onEdit func()) *requestEditor {
+func newRequestEditor(rd *requestData, onEdit func(), onAddVariable func(*variableEntry)) *requestEditor {
 	e := &requestEditor{requestType: requestTypeHTTP}
 	if rd != nil {
 		e.requestType = normalizedRequestType(rd.Type)
 	}
 
-	e.urlEntry = widget.NewEntry()
+	newEntry := func() *variableEntry { return newVariableEntry(false, false, onAddVariable) }
+	e.urlEntry = newEntry()
 	e.urlEntry.SetPlaceHolder("http://localhost:3000")
 
-	e.rawBody = widget.NewMultiLineEntry()
+	e.rawBody = newVariableEntry(true, false, onAddVariable)
 	e.rawBody.SetText("{}")
 
 	e.method = widget.NewSelect(
@@ -96,10 +97,10 @@ func newRequestEditor(rd *requestData, onEdit func()) *requestEditor {
 		}
 	}
 
-	headersSection, headerPairs := keyValueSection("Adicionar Header", "Content-Type", "application/json", defHeaders, onEdit)
-	paramsSection, paramPairs := keyValueSection("Adicionar Param", "chave", "valor", defParams, onEdit)
-	formSection, formPairs := keyValueSection("Adicionar Campo", "chave", "valor", defForm, onEdit)
-	multipartSection, multipartPairs := keyValueSection("Adicionar Campo", "chave", "valor", defMultipart, onEdit)
+	headersSection, headerPairs := keyValueSection("Adicionar Header", "Content-Type", "application/json", defHeaders, onEdit, newEntry)
+	paramsSection, paramPairs := keyValueSection("Adicionar Param", "chave", "valor", defParams, onEdit, newEntry)
+	formSection, formPairs := keyValueSection("Adicionar Campo", "chave", "valor", defForm, onEdit, newEntry)
+	multipartSection, multipartPairs := keyValueSection("Adicionar Campo", "chave", "valor", defMultipart, onEdit, newEntry)
 
 	e.headers = headerPairs
 	e.params = paramPairs
@@ -113,13 +114,13 @@ func newRequestEditor(rd *requestData, onEdit func()) *requestEditor {
 		nil,
 	)
 
-	e.authorizationContent = widget.NewMultiLineEntry()
+	e.authorizationContent = newVariableEntry(true, false, onAddVariable)
 	e.authorizationContent.SetMinRowsVisible(1)
 	e.authorizationContent.SetPlaceHolder("Auth Content")
 
-	e.basicUserEntry = widget.NewEntry()
+	e.basicUserEntry = newEntry()
 	e.basicUserEntry.SetPlaceHolder("usuário")
-	e.basicPassEntry = widget.NewPasswordEntry()
+	e.basicPassEntry = newVariableEntry(false, true, onAddVariable)
 	e.basicPassEntry.SetPlaceHolder("senha")
 	e.basicForm = &widget.Form{
 		Items: []*widget.FormItem{
@@ -128,9 +129,9 @@ func newRequestEditor(rd *requestData, onEdit func()) *requestEditor {
 		},
 	}
 
-	e.apiKeyNameEntry = widget.NewEntry()
+	e.apiKeyNameEntry = newEntry()
 	e.apiKeyNameEntry.SetPlaceHolder("X-API-Key")
-	e.apiKeyValueEntry = widget.NewEntry()
+	e.apiKeyValueEntry = newEntry()
 	e.apiKeyValueEntry.SetPlaceHolder("valor")
 	e.apiKeyLocation = widget.NewSelect([]string{"header", "query"}, nil)
 	e.apiKeyForm = &widget.Form{
@@ -141,13 +142,13 @@ func newRequestEditor(rd *requestData, onEdit func()) *requestEditor {
 		},
 	}
 
-	e.oauth1ConsumerKey = widget.NewEntry()
+	e.oauth1ConsumerKey = newEntry()
 	e.oauth1ConsumerKey.SetPlaceHolder("consumer key")
-	e.oauth1ConsumerSecret = widget.NewEntry()
+	e.oauth1ConsumerSecret = newEntry()
 	e.oauth1ConsumerSecret.SetPlaceHolder("consumer secret")
-	e.oauth1AccessToken = widget.NewEntry()
+	e.oauth1AccessToken = newEntry()
 	e.oauth1AccessToken.SetPlaceHolder("access token")
-	e.oauth1TokenSecret = widget.NewEntry()
+	e.oauth1TokenSecret = newEntry()
 	e.oauth1TokenSecret.SetPlaceHolder("token secret")
 	e.oauth1SignatureMethod = widget.NewSelect(
 		[]string{"HMAC-SHA1", "HMAC-SHA256", "PLAINTEXT"}, nil,
@@ -163,17 +164,17 @@ func newRequestEditor(rd *requestData, onEdit func()) *requestEditor {
 	}
 
 	e.oauthGrantType = widget.NewSelect([]string{"client_credentials", "password"}, nil)
-	e.oauthTokenURL = widget.NewEntry()
+	e.oauthTokenURL = newEntry()
 	e.oauthTokenURL.SetPlaceHolder("https://.../oauth/token")
-	e.oauthClientID = widget.NewEntry()
+	e.oauthClientID = newEntry()
 	e.oauthClientID.SetPlaceHolder("client_id")
-	e.oauthClientSecret = widget.NewEntry()
+	e.oauthClientSecret = newEntry()
 	e.oauthClientSecret.SetPlaceHolder("client_secret")
-	e.oauthUsername = widget.NewEntry()
+	e.oauthUsername = newEntry()
 	e.oauthUsername.SetPlaceHolder("username")
-	e.oauthPassword = widget.NewEntry()
+	e.oauthPassword = newEntry()
 	e.oauthPassword.SetPlaceHolder("password")
-	e.oauthScope = widget.NewEntry()
+	e.oauthScope = newEntry()
 	e.oauthScope.SetPlaceHolder("scope")
 	e.oauthForm = &widget.Form{
 		Items: []*widget.FormItem{
@@ -408,6 +409,7 @@ type requestTab struct {
 	respHeaders    *widget.Entry
 	content        *fyne.Container
 	sync           func(*requestTab)
+	variables      func(string) [][2]string
 	saveTimer      *time.Timer
 }
 
@@ -423,7 +425,7 @@ func (rt *requestTab) scheduleSync() {
 	})
 }
 
-func newRequestTab(w fyne.Window, rd *requestData, collectionName string, sync func(*requestTab), onRename func(*requestTab)) *requestTab {
+func newRequestTab(w fyne.Window, rd *requestData, collectionName string, sync func(*requestTab), variables func(string) [][2]string, onRename func(*requestTab)) *requestTab {
 	name := "Nova Requisição"
 	if rd != nil && rd.Name != "" {
 		name = rd.Name
@@ -433,9 +435,16 @@ func newRequestTab(w fyne.Window, rd *requestData, collectionName string, sync f
 		name:           name,
 		collectionName: collectionName,
 		sync:           sync,
+		variables:      variables,
 	}
 
-	rt.editor = newRequestEditor(rd, rt.scheduleSync)
+	rt.editor = newRequestEditor(rd, rt.scheduleSync, func(entry *variableEntry) {
+		var variables [][2]string
+		if rt.variables != nil {
+			variables = rt.variables(rt.collectionName)
+		}
+		showVariablePicker(w, entry, variables)
+	})
 
 	rt.nameLabel = newRenameLabel()
 	rt.nameLabel.TextStyle = fyne.TextStyle{Bold: true}
@@ -471,6 +480,16 @@ func newRequestTab(w fyne.Window, rd *requestData, collectionName string, sync f
 
 	sendButton := widget.NewButton("Enviar", func() {
 		s := rt.editor.snapshot()
+		var variables [][2]string
+		if rt.variables != nil {
+			variables = rt.variables(rt.collectionName)
+		}
+		var err error
+		s, err = expandRequestSnapshot(s, variables)
+		if err != nil {
+			showError(status, respBody, respHeaders, err)
+			return
+		}
 		status.Text = "Enviando..."
 		status.Color = theme.ForegroundColor()
 		status.Refresh()

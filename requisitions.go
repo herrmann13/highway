@@ -32,8 +32,8 @@ import (
 )
 
 type kvPair struct {
-	key   *widget.Entry
-	value *widget.Entry
+	key   *variableEntry
+	value *variableEntry
 	row   *fyne.Container
 }
 
@@ -156,9 +156,17 @@ func main() {
 	}
 
 	var renameRequest func(*requestTab)
+	variablesForCollection := func(colName string) [][2]string {
+		for _, c := range collections {
+			if c.Name == colName {
+				return c.Variables
+			}
+		}
+		return nil
+	}
 
 	addTab := func(rd *requestData, collectionName string) *container.TabItem {
-		rt := newRequestTab(w, rd, collectionName, sync, func(rt *requestTab) {
+		rt := newRequestTab(w, rd, collectionName, sync, variablesForCollection, func(rt *requestTab) {
 			renameRequest(rt)
 		})
 		item := container.NewTabItem(rt.name, rt.content)
@@ -365,6 +373,38 @@ func main() {
 		}, w)
 	}
 
+	showCollectionVariables := func(colName string) {
+		var target *collection
+		for _, c := range collections {
+			if c.Name == colName {
+				target = c
+				break
+			}
+		}
+		if target == nil {
+			return
+		}
+
+		var pairs *[]kvPair
+		section, pairs := keyValueSection("Adicionar variável", "base_url", "https://api.exemplo.com", target.Variables, func() {
+			variables := snapshotPairs(*pairs)
+			if _, err := variableValues(variables); err != nil {
+				dialog.ShowInformation("Variáveis", err.Error(), w)
+				return
+			}
+			previous := target.Variables
+			target.Variables = variables
+			if err := saveCollection(target); err != nil {
+				target.Variables = previous
+				dialog.ShowInformation("Erro", err.Error(), w)
+			}
+		}, func() *variableEntry { return newVariableEntry(false, false, nil) })
+
+		d := dialog.NewCustom("Variáveis: "+target.Name, "Fechar", section, w)
+		d.Resize(fyne.NewSize(680, 420))
+		d.Show()
+	}
+
 	showCollectionMenu := func(btn *widget.Button, colName string) {
 		c := fyne.CurrentApp().Driver().CanvasForObject(btn)
 		if c == nil {
@@ -373,10 +413,13 @@ func main() {
 		newItem := fyne.NewMenuItem("Nova requisição", func() {
 			createRequestInCollection(colName)
 		})
+		variablesItem := fyne.NewMenuItem("Variáveis", func() {
+			showCollectionVariables(colName)
+		})
 		deleteItem := fyne.NewMenuItem("Excluir coleção", func() {
 			deleteCollectionFlow(colName)
 		})
-		pop := widget.NewPopUpMenu(fyne.NewMenu("", newItem, deleteItem), c)
+		pop := widget.NewPopUpMenu(fyne.NewMenu("", newItem, variablesItem, deleteItem), c)
 		pos := fyne.CurrentApp().Driver().AbsolutePositionForObject(btn)
 		pop.ShowAtPosition(pos.Add(fyne.NewPos(0, btn.Size().Height)))
 	}
@@ -715,19 +758,19 @@ func snapshotPairs(pairs []kvPair) [][2]string {
 	return out
 }
 
-func keyValueSection(addLabel, keyPlaceholder, valuePlaceholder string, defaults [][2]string, onChange func()) (*fyne.Container, *[]kvPair) {
+func keyValueSection(addLabel, keyPlaceholder, valuePlaceholder string, defaults [][2]string, onChange func(), newEntry func() *variableEntry) (*fyne.Container, *[]kvPair) {
 	pairs := []kvPair{}
 	list := container.NewVBox()
 
-	keyEntry := widget.NewEntry()
+	keyEntry := newEntry()
 	keyEntry.SetPlaceHolder(keyPlaceholder)
-	valueEntry := widget.NewEntry()
+	valueEntry := newEntry()
 	valueEntry.SetPlaceHolder(valuePlaceholder)
 
 	addPair := func(k, v string) {
 		pair := kvPair{
-			key:   widget.NewEntry(),
-			value: widget.NewEntry(),
+			key:   newEntry(),
+			value: newEntry(),
 		}
 		pair.key.SetText(k)
 		pair.value.SetText(v)
