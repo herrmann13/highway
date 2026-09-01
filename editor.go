@@ -396,7 +396,7 @@ type requestTab struct {
 	name           string
 	collectionName string
 	item           *container.TabItem
-	nameEntry      *widget.Entry
+	nameLabel      *renameLabel
 	editor         *requestEditor
 	status         *canvas.Text
 	respBody       *widget.Entry
@@ -418,7 +418,7 @@ func (rt *requestTab) scheduleSync() {
 	})
 }
 
-func newRequestTab(w fyne.Window, rd *requestData, collectionName string, sync func(*requestTab)) *requestTab {
+func newRequestTab(w fyne.Window, rd *requestData, collectionName string, sync func(*requestTab), onRename func(*requestTab)) *requestTab {
 	name := "Nova Requisição"
 	if rd != nil && rd.Name != "" {
 		name = rd.Name
@@ -432,10 +432,14 @@ func newRequestTab(w fyne.Window, rd *requestData, collectionName string, sync f
 
 	rt.editor = newRequestEditor(rd, rt.scheduleSync)
 
-	rt.nameEntry = widget.NewEntry()
-	rt.nameEntry.SetText(rt.name)
-	rt.nameEntry.SetPlaceHolder("Nome da requisição")
-	rt.nameEntry.OnChanged = func(string) { rt.scheduleSync() }
+	rt.nameLabel = newRenameLabel()
+	rt.nameLabel.TextStyle = fyne.TextStyle{Bold: true}
+	rt.nameLabel.SetText(rt.name)
+	rt.nameLabel.onDoubleTapped = func() {
+		if onRename != nil {
+			onRename(rt)
+		}
+	}
 
 	status := canvas.NewText("", theme.ForegroundColor())
 	status.TextSize = theme.TextSize()
@@ -506,7 +510,7 @@ func newRequestTab(w fyne.Window, rd *requestData, collectionName string, sync f
 	split.SetOffset(0.4)
 
 	rt.content = container.NewBorder(
-		container.NewVBox(rt.nameEntry, urlRow, widget.NewSeparator()),
+		container.NewVBox(rt.nameLabel, urlRow, widget.NewSeparator()),
 		nil, nil, nil, split,
 	)
 

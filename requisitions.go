@@ -66,6 +66,59 @@ type authConfig struct {
 	Scope                 string `json:"scope"`
 }
 
+type renameLabel struct {
+	widget.Label
+	onTapped       func()
+	onDoubleTapped func()
+}
+
+func newRenameLabel() *renameLabel {
+	label := &renameLabel{}
+	label.ExtendBaseWidget(label)
+	return label
+}
+
+func (l *renameLabel) CreateRenderer() fyne.WidgetRenderer {
+	renderer := l.Label.CreateRenderer()
+	l.ExtendBaseWidget(l)
+	return renderer
+}
+
+func (l *renameLabel) Tapped(*fyne.PointEvent) {
+	if l.onTapped != nil {
+		l.onTapped()
+	}
+}
+
+func (l *renameLabel) DoubleTapped(*fyne.PointEvent) {
+	if l.onDoubleTapped != nil {
+		l.onDoubleTapped()
+	}
+}
+
+func showRenameDialog(w fyne.Window, title, current string, validate func(string) error, onSave func(string)) {
+	nameEntry := widget.NewEntry()
+	nameEntry.SetText(current)
+	nameEntry.Validator = func(name string) error {
+		return validate(strings.TrimSpace(name))
+	}
+
+	d := dialog.NewForm(
+		title,
+		"Salvar",
+		"Cancelar",
+		[]*widget.FormItem{widget.NewFormItem("Nome", nameEntry)},
+		func(ok bool) {
+			if ok {
+				onSave(strings.TrimSpace(nameEntry.Text))
+			}
+		},
+		w,
+	)
+	d.Resize(fyne.NewSize(520, 180))
+	d.Show()
+}
+
 func main() {
 	a := app.NewWithID("com.herrmann.requisitions")
 	a.Settings().SetTheme(theme.DarkTheme())
@@ -82,11 +135,7 @@ func main() {
 	var tree *widget.Tree
 
 	sync := func(rt *requestTab) {
-		newName := strings.TrimSpace(rt.nameEntry.Text)
-		if newName == "" {
-			newName = rt.name
-			rt.nameEntry.SetText(newName)
-		}
+		newName := rt.name
 		if rt.collectionName == "" {
 			rt.name = newName
 			if rt.item != nil {
@@ -95,9 +144,6 @@ func main() {
 			return
 		}
 		if err := upsertRequest(collections, rt.collectionName, rt.name, rt.editor.toData(newName)); err != nil {
-			if rt.nameEntry.Text != rt.name {
-				rt.nameEntry.SetText(rt.name)
-			}
 			dialog.ShowInformation("Erro", err.Error(), w)
 			return
 		}
@@ -108,8 +154,12 @@ func main() {
 		tree.Refresh()
 	}
 
+	var renameRequest func(*requestTab)
+
 	addTab := func(rd *requestData, collectionName string) *container.TabItem {
-		rt := newRequestTab(w, rd, collectionName, sync)
+		rt := newRequestTab(w, rd, collectionName, sync, func(rt *requestTab) {
+			renameRequest(rt)
+		})
 		item := container.NewTabItem(rt.name, rt.content)
 		rt.item = item
 		tabIndex[item] = rt
@@ -168,6 +218,94 @@ func main() {
 		}
 	}
 
+	renameRequest = func(rt *requestTab) {
+		oldName := rt.name
+		showRenameDialog(w, "Renomear requisição", oldName, func(name string) error {
+			if name == "" {
+				return fmt.Errorf("informe o nome da requisição")
+			}
+			if rt.collectionName == "" {
+				return nil
+			}
+			for _, c := range collections {
+				if c.Name == rt.collectionName && requestNameExists(c, name, -1) && name != oldName {
+					return fmt.Errorf("já existe uma requisição com o nome %q", name)
+				}
+			}
+			return nil
+		}, func(name string) {
+			if name == oldName {
+				return
+			}
+			if rt.collectionName != "" {
+				for _, c := range collections {
+					if c.Name != rt.collectionName {
+						continue
+					}
+					for i := range c.Requests {
+						if c.Requests[i].Name != oldName {
+							continue
+						}
+						c.Requests[i].Name = name
+						if err := saveCollection(c); err != nil {
+							c.Requests[i].Name = oldName
+							dialog.ShowInformation("Erro", err.Error(), w)
+							return
+						}
+						break
+					}
+					break
+				}
+			}
+			for _, openTab := range tabIndex {
+				if openTab.collectionName != rt.collectionName || openTab.name != oldName {
+					continue
+				}
+				openTab.name = name
+				openTab.nameLabel.SetText(name)
+				openTab.item.Text = name
+			}
+			tabs.Refresh()
+			tree.Refresh()
+		})
+	}
+
+	renameCollectionFlow := func(oldName string) {
+		var target *collection
+		for _, c := range collections {
+			if c.Name == oldName {
+				target = c
+				break
+			}
+		}
+		if target == nil {
+			return
+		}
+
+		showRenameDialog(w, "Renomear coleção", oldName, func(name string) error {
+			if name == "" {
+				return fmt.Errorf("informe o nome da coleção")
+			}
+			for _, c := range collections {
+				if c != target && c.Name == name {
+					return fmt.Errorf("já existe uma coleção com o nome %q", name)
+				}
+			}
+			return nil
+		}, func(name string) {
+			if err := renameCollection(target, name); err != nil {
+				dialog.ShowInformation("Erro", err.Error(), w)
+				return
+			}
+			for _, rt := range tabIndex {
+				if rt.collectionName == oldName {
+					rt.collectionName = name
+				}
+			}
+			tree.Refresh()
+		})
+	}
+
 	deleteCollectionFlow := func(colName string) {
 		dialog.ShowConfirm("Excluir", "Excluir a coleção \""+colName+"\"?", func(ok bool) {
 			if !ok {
@@ -214,12 +352,12 @@ func main() {
 		func(branch bool) fyne.CanvasObject {
 			if branch {
 				return container.NewHBox(
-					widget.NewLabel(""),
+					newRenameLabel(),
 					layout.NewSpacer(),
 					widget.NewButton("⋯", nil),
 				)
 			}
-			return widget.NewLabel("")
+			return newRenameLabel()
 		},
 		func(uid string, branch bool, node fyne.CanvasObject) {
 			if branch {
@@ -227,14 +365,16 @@ func main() {
 				if !ok || len(box.Objects) < 3 {
 					return
 				}
-				label := box.Objects[0].(*widget.Label)
+				label := box.Objects[0].(*renameLabel)
 				btn := box.Objects[2].(*widget.Button)
 				colName := strings.TrimPrefix(uid, "col:")
 				label.SetText(colName)
+				label.onTapped = func() { tree.Select(uid) }
+				label.onDoubleTapped = func() { renameCollectionFlow(colName) }
 				btn.OnTapped = func() { showCollectionMenu(btn, colName) }
 				return
 			}
-			label, ok := node.(*widget.Label)
+			label, ok := node.(*renameLabel)
 			if !ok {
 				return
 			}
@@ -243,6 +383,35 @@ func main() {
 				label.SetText(rest[idx+1:])
 			} else {
 				label.SetText(rest)
+			}
+			label.onTapped = func() { tree.Select(uid) }
+			label.onDoubleTapped = func() {
+				idx := strings.LastIndex(rest, "/")
+				if idx < 0 {
+					return
+				}
+				colName := rest[:idx]
+				reqName := rest[idx+1:]
+				for _, rt := range tabIndex {
+					if rt.collectionName == colName && rt.name == reqName {
+						renameRequest(rt)
+						return
+					}
+				}
+				for _, c := range collections {
+					if c.Name != colName {
+						continue
+					}
+					for _, r := range c.Requests {
+						if r.Name != reqName {
+							continue
+						}
+						rd := r
+						openTab(&rd, colName)
+						renameRequest(tabIndex[tabs.Selected()])
+						return
+					}
+				}
 			}
 		},
 	)

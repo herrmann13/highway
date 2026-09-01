@@ -85,6 +85,39 @@ func saveCollection(c *collection) error {
 	return os.WriteFile(collectionFilePath(dir, c.Name), data, 0o644)
 }
 
+func renameCollection(c *collection, name string) error {
+	if name == c.Name {
+		return nil
+	}
+
+	dir, err := collectionsDir()
+	if err != nil {
+		return err
+	}
+
+	renamed := *c
+	renamed.Name = name
+	data, err := json.MarshalIndent(&renamed, "", "  ")
+	if err != nil {
+		return err
+	}
+
+	oldPath := collectionFilePath(dir, c.Name)
+	newPath := collectionFilePath(dir, name)
+	if err := os.WriteFile(newPath, data, 0o644); err != nil {
+		return err
+	}
+	if oldPath != newPath {
+		if err := os.Remove(oldPath); err != nil {
+			_ = os.Remove(newPath)
+			return err
+		}
+	}
+
+	c.Name = name
+	return nil
+}
+
 func deleteCollection(name string) error {
 	dir, err := collectionsDir()
 	if err != nil {
