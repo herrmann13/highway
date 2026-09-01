@@ -407,6 +407,7 @@ type requestTab struct {
 	status         *canvas.Text
 	respBody       *widget.Entry
 	respHeaders    *widget.Entry
+	responseViewer *responseViewer
 	content        *fyne.Container
 	sync           func(*requestTab)
 	variables      func(string) [][2]string
@@ -459,22 +460,22 @@ func newRequestTab(w fyne.Window, rd *requestData, collectionName string, sync f
 	status.TextSize = theme.TextSize()
 	rt.status = status
 
-	respBody := widget.NewMultiLineEntry()
-	respBody.SetPlaceHolder("Resposta")
-	respBody.Disable()
+	responseViewer := newResponseViewer()
+	respBody := responseViewer.entry
 	respHeaders := widget.NewMultiLineEntry()
 	respHeaders.SetPlaceHolder("Headers da resposta")
 	respHeaders.Disable()
 	rt.respBody = respBody
 	rt.respHeaders = respHeaders
+	rt.responseViewer = responseViewer
 
 	copyButton := widget.NewButton("Copiar", func() {
-		w.Clipboard().SetContent(respBody.Text)
+		w.Clipboard().SetContent(responseViewer.fullBody)
 	})
 	statusRow := container.NewHBox(status, layout.NewSpacer(), copyButton)
 
 	responseTabs := container.NewAppTabs(
-		container.NewTabItem("Body", respBody),
+		container.NewTabItem("Body", container.NewBorder(responseViewer.controls, nil, nil, nil, respBody)),
 		container.NewTabItem("Headers", respHeaders),
 	)
 
@@ -487,9 +488,11 @@ func newRequestTab(w fyne.Window, rd *requestData, collectionName string, sync f
 		var err error
 		s, err = expandRequestSnapshot(s, variables)
 		if err != nil {
+			responseViewer.clear()
 			showError(status, respBody, respHeaders, err)
 			return
 		}
+		responseViewer.clear()
 		status.Text = "Enviando..."
 		status.Color = theme.ForegroundColor()
 		status.Refresh()
@@ -497,12 +500,16 @@ func newRequestTab(w fyne.Window, rd *requestData, collectionName string, sync f
 		go func() {
 			reqBody, contentType, err := buildBody(s.bodyType, s.rawBody, s.form, s.multipart)
 			if err != nil {
-				fyne.Do(func() { showError(status, respBody, respHeaders, err) })
+				fyne.Do(func() {
+					responseViewer.clear()
+					showError(status, respBody, respHeaders, err)
+				})
 				return
 			}
 			result, err := sendRequest(s.method, s.url, s.queryParams, s.headers, reqBody, contentType, s.auth)
 			fyne.Do(func() {
 				if err != nil {
+					responseViewer.clear()
 					showError(status, respBody, respHeaders, err)
 					return
 				}
@@ -514,7 +521,7 @@ func newRequestTab(w fyne.Window, rd *requestData, collectionName string, sync f
 				)
 				status.Color = statusColor(result.statusCode)
 				status.Refresh()
-				respBody.SetText(result.body)
+				responseViewer.setResponse(result.body)
 				respHeaders.SetText(formatHeaders(result.headers))
 			})
 		}()

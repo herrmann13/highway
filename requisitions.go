@@ -44,6 +44,11 @@ type responseResult struct {
 	duration   time.Duration
 }
 
+const (
+	maxResponseBytes   = 50 * 1024 * 1024
+	maxPrettyJSONBytes = 512 * 1024
+)
+
 type authConfig struct {
 	AuthType              string `json:"authType"`
 	Token                 string `json:"token"`
@@ -934,9 +939,12 @@ func sendRequest(method, rawURL string, params, headers [][2]string, reqBody io.
 	}
 	defer resp.Body.Close()
 
-	respBody, err := io.ReadAll(resp.Body)
+	respBody, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes+1))
 	if err != nil {
 		return result, fmt.Errorf("erro ao ler resposta: %w", err)
+	}
+	if len(respBody) > maxResponseBytes {
+		return result, fmt.Errorf("resposta excede o limite de %d MB", maxResponseBytes/(1024*1024))
 	}
 
 	result.statusCode = resp.StatusCode
@@ -944,7 +952,7 @@ func sendRequest(method, rawURL string, params, headers [][2]string, reqBody io.
 	result.headers = resp.Header
 	result.body = string(respBody)
 
-	if strings.Contains(resp.Header.Get("Content-Type"), "application/json") {
+	if len(respBody) <= maxPrettyJSONBytes && strings.Contains(resp.Header.Get("Content-Type"), "application/json") {
 		var pretty bytes.Buffer
 		if err := json.Indent(&pretty, respBody, "", "  "); err == nil {
 			result.body = pretty.String()
