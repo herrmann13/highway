@@ -1,4 +1,4 @@
-module carteiro
+module highway
 
 go 1.22.2
 

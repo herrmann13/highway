@@ -19,6 +19,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"fyne.io/fyne/v2"
@@ -122,9 +123,9 @@ func showRenameDialog(w fyne.Window, title, current string, validate func(string
 }
 
 func main() {
-	a := app.NewWithID("com.herrmann.requisitions")
+	a := app.NewWithID("com.herrmann.highway")
 	a.Settings().SetTheme(theme.DarkTheme())
-	w := a.NewWindow("Requisição HTTP")
+	w := a.NewWindow("Highway")
 
 	collections, err := loadCollections()
 	if err != nil {
@@ -552,8 +553,8 @@ func main() {
 		d.Show()
 	})
 
-	var showCurlImportDialog func()
-	showCurlImportDialog = func() {
+	var showCurlImportDialog func(string)
+	showCurlImportDialog = func(command string) {
 		if len(collections) == 0 {
 			dialog.ShowInformation("Importação", "Crie uma coleção antes de importar uma requisição.", w)
 			return
@@ -573,7 +574,10 @@ func main() {
 		curlEntry := widget.NewMultiLineEntry()
 		curlEntry.SetMinRowsVisible(10)
 		curlEntry.SetPlaceHolder("curl https://api.exemplo.com/usuarios -H 'Accept: application/json'")
-		curlEntry.SetText(w.Clipboard().Content())
+		if command == "" {
+			command = w.Clipboard().Content()
+		}
+		curlEntry.SetText(command)
 
 		d := dialog.NewForm(
 			"Importar cURL",
@@ -622,13 +626,49 @@ func main() {
 		if c == nil {
 			return
 		}
-		item := fyne.NewMenuItem("cURL", showCurlImportDialog)
+		item := fyne.NewMenuItem("cURL", func() { showCurlImportDialog("") })
 		pop := widget.NewPopUpMenu(fyne.NewMenu("", item), c)
 		pos := fyne.CurrentApp().Driver().AbsolutePositionForObject(importButton)
 		pop.ShowAtPosition(pos.Add(fyne.NewPos(0, importButton.Size().Height)))
 	})
 
-	actionBar := container.NewHBox(newCollectionButton, importButton)
+	var monitorCurl atomic.Bool
+	monitorCurl.Store(a.Preferences().BoolWithFallback("detect-curl", false))
+	monitorCheck := widget.NewCheck("Detectar cURLs", func(enabled bool) {
+		monitorCurl.Store(enabled)
+		a.Preferences().SetBool("detect-curl", enabled)
+	})
+	monitorCheck.SetChecked(monitorCurl.Load())
+
+	var curlPromptOpen atomic.Bool
+	go func() {
+		ticker := time.NewTicker(time.Second)
+		defer ticker.Stop()
+		detector := &curlClipboardDetector{}
+		for range ticker.C {
+			if !monitorCurl.Load() {
+				continue
+			}
+			command, detected := detector.detect(w.Clipboard().Content())
+			if !detected || !curlPromptOpen.CompareAndSwap(false, true) {
+				continue
+			}
+			fyne.Do(func() {
+				if !monitorCurl.Load() {
+					curlPromptOpen.Store(false)
+					return
+				}
+				dialog.ShowConfirm("cURL detectado", "Abrir esta requisição no Highway?", func(open bool) {
+					curlPromptOpen.Store(false)
+					if open {
+						showCurlImportDialog(command)
+					}
+				}, w)
+			})
+		}
+	}()
+
+	actionBar := container.NewVBox(container.NewHBox(newCollectionButton, importButton), monitorCheck)
 	sidebar := container.NewBorder(actionBar, nil, nil, nil, container.NewScroll(tree))
 
 	split := container.NewHSplit(sidebar, tabs)

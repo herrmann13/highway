@@ -36,11 +36,43 @@ func collectionsDir() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	dir := filepath.Join(base, "carteiro", "collections")
+	dir := filepath.Join(base, "highway", "collections")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return "", err
 	}
+	if err := migrateCollections(filepath.Join(base, "carteiro", "collections"), dir); err != nil {
+		return "", err
+	}
 	return dir, nil
+}
+
+func migrateCollections(sourceDir, destinationDir string) error {
+	entries, err := os.ReadDir(sourceDir)
+	if os.IsNotExist(err) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".json") {
+			continue
+		}
+		destination := filepath.Join(destinationDir, entry.Name())
+		if _, err := os.Stat(destination); err == nil {
+			continue
+		} else if !os.IsNotExist(err) {
+			return err
+		}
+		data, err := os.ReadFile(filepath.Join(sourceDir, entry.Name()))
+		if err != nil {
+			return err
+		}
+		if err := os.WriteFile(destination, data, 0o644); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func collectionFilePath(dir, name string) string {
