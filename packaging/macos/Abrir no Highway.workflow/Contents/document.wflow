@@ -13,36 +13,16 @@
     <dict>
       <key>action</key>
       <dict>
-        <key>AMAcceptsInput</key>
-        <true/>
-        <key>AMActionVersion</key>
-        <string>2.0.2</string>
-        <key>AMApplication</key>
-        <array>
-          <string>Automator</string>
-        </array>
-        <key>AMBundleIdentifier</key>
-        <string>com.apple.RunShellScript</string>
-        <key>AMName</key>
+        <key>ActionBundlePath</key>
+        <string>/System/Library/Automator/Run Shell Script.action</string>
+        <key>ActionName</key>
         <string>Run Shell Script</string>
-        <key>AMProvides</key>
+        <key>ActionParameters</key>
         <dict>
-          <key>Results</key>
-          <array>
-            <dict>
-              <key>Type</key>
-              <string>com.apple.cocoa.string</string>
-            </dict>
-          </array>
-        </dict>
-        <key>AMUUID</key>
-        <string>6F7545CD-776A-4A84-8D1B-7EE7DF70DDF4</string>
-        <key>InputMethod</key>
-        <integer>1</integer>
-        <key>Shell</key>
-        <string>/bin/zsh</string>
-        <key>Source</key>
-        <string>#!/bin/zsh
+          <key>CheckedForUserDefaultShell</key>
+          <true/>
+          <key>COMMAND_STRING</key>
+          <string>#!/bin/zsh
 set -eu
 highway="/Applications/Highway.app/Contents/MacOS/highway"
 if [[ ! -x "$highway" ]]; then
@@ -53,6 +33,76 @@ input="$(cat)"
 if [[ -n "$input" ]]; then
   printf '%s' "$input" | "$highway" import --curl-stdin &gt;/dev/null 2&gt;&amp;1
 fi</string>
+          <key>inputMethod</key>
+          <integer>0</integer>
+          <key>shell</key>
+          <string>/bin/zsh</string>
+          <key>source</key>
+          <string></string>
+        </dict>
+        <key>AMAccepts</key>
+        <dict>
+          <key>Container</key>
+          <string>List</string>
+          <key>Optional</key>
+          <true/>
+          <key>Types</key>
+          <array>
+            <string>com.apple.cocoa.string</string>
+          </array>
+        </dict>
+        <key>AMActionVersion</key>
+        <string>2.0.3</string>
+        <key>AMApplication</key>
+        <array>
+          <string>Automator</string>
+        </array>
+        <key>AMParameterProperties</key>
+        <dict>
+          <key>CheckedForUserDefaultShell</key>
+          <dict/>
+          <key>COMMAND_STRING</key>
+          <dict/>
+          <key>inputMethod</key>
+          <dict/>
+          <key>shell</key>
+          <dict/>
+          <key>source</key>
+          <dict/>
+        </dict>
+        <key>AMProvides</key>
+        <dict>
+          <key>Container</key>
+          <string>List</string>
+          <key>Types</key>
+          <array>
+            <string>com.apple.cocoa.string</string>
+          </array>
+        </dict>
+        <key>BundleIdentifier</key>
+        <string>com.apple.RunShellScript</string>
+        <key>CanShowSelectedItemsWhenRun</key>
+        <false/>
+        <key>CanShowWhenRun</key>
+        <true/>
+        <key>Class Name</key>
+        <string>RunShellScriptAction</string>
+        <key>InputUUID</key>
+        <string>F4F11C1B-18EE-4E9D-A978-7BB8655C5BC8</string>
+        <key>Keywords</key>
+        <array>
+          <string>Shell</string>
+          <string>Script</string>
+          <string>Command</string>
+          <string>Run</string>
+          <string>Unix</string>
+        </array>
+        <key>OutputUUID</key>
+        <string>8B6F58FC-6D7A-48CF-94A2-3A9F8AA9F0E5</string>
+        <key>UUID</key>
+        <string>0D9781D5-E7DD-46C7-92DE-6B9B0B2B7B17</string>
+        <key>isViewVisible</key>
+        <true/>
       </dict>
       <key>isViewVisible</key>
       <true/>
@@ -62,6 +112,10 @@ fi</string>
   <dict/>
   <key>workflowMetaData</key>
   <dict>
+    <key>serviceApplicationBundleID</key>
+    <string></string>
+    <key>serviceApplicationPath</key>
+    <string></string>
     <key>serviceInputTypeIdentifier</key>
     <string>com.apple.Automator.text</string>
     <key>serviceOutputTypeIdentifier</key>
