@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/base64"
 	"fmt"
 	"net/url"
 	"strings"
@@ -19,6 +20,7 @@ func parseCurl(command string) (requestData, error) {
 	var rawData []string
 	var encodedData []string
 	forceGet := false
+	var bearerToken string
 
 	nextValue := func(index *int, option string) (string, error) {
 		*index = *index + 1
@@ -83,6 +85,12 @@ func parseCurl(command string) (requestData, error) {
 			if len(credentials) == 2 {
 				rd.Auth.BasicPass = credentials[1]
 			}
+		case "--oauth2-bearer":
+			value, err := nextValue(&i, arg)
+			if err != nil {
+				return requestData{}, err
+			}
+			bearerToken = value
 		case "--url":
 			value, err := nextValue(&i, arg)
 			if err != nil {
@@ -100,6 +108,23 @@ func parseCurl(command string) (requestData, error) {
 			}
 			rd.URL = arg
 		}
+	}
+	if bearerToken != "" {
+		rd.Auth.AuthType = "Bearer Token"
+		rd.Auth.Token = bearerToken
+	}
+	var basicUser, basicPass string
+	var basicFound bool
+	rd.Headers, basicUser, basicPass, basicFound = extractBasicAuth(rd.Headers)
+	if basicFound {
+		rd.Auth.AuthType = "Basic Auth"
+		rd.Auth.BasicUser = basicUser
+		rd.Auth.BasicPass = basicPass
+	}
+	rd.Headers, bearerToken, _ = extractBearerAuth(rd.Headers)
+	if bearerToken != "" {
+		rd.Auth.AuthType = "Bearer Token"
+		rd.Auth.Token = bearerToken
 	}
 
 	if rd.URL == "" {
@@ -170,6 +195,53 @@ func parseCurl(command string) (requestData, error) {
 	}
 
 	return rd, nil
+}
+
+func extractBearerAuth(headers [][2]string) ([][2]string, string, bool) {
+	filtered := make([][2]string, 0, len(headers))
+	var token string
+	found := false
+	for _, header := range headers {
+		if strings.EqualFold(strings.TrimSpace(header[0]), "Authorization") {
+			value := strings.TrimSpace(header[1])
+			if len(value) > len("Bearer") && strings.EqualFold(value[:len("Bearer")], "Bearer") && (value[len("Bearer")] == ' ' || value[len("Bearer")] == '\t') {
+				candidate := strings.TrimSpace(value[len("Bearer"):])
+				if candidate != "" {
+					token = candidate
+					found = true
+					continue
+				}
+			}
+		}
+		filtered = append(filtered, header)
+	}
+	return filtered, token, found
+}
+
+func extractBasicAuth(headers [][2]string) ([][2]string, string, string, bool) {
+	filtered := make([][2]string, 0, len(headers))
+	var user, password string
+	found := false
+	for _, header := range headers {
+		if strings.EqualFold(strings.TrimSpace(header[0]), "Authorization") {
+			value := strings.TrimSpace(header[1])
+			if len(value) > len("Basic") && strings.EqualFold(value[:len("Basic")], "Basic") && (value[len("Basic")] == ' ' || value[len("Basic")] == '\t') {
+				encoded := strings.TrimSpace(value[len("Basic"):])
+				decoded, err := base64.StdEncoding.DecodeString(encoded)
+				if err == nil {
+					credentials := string(decoded)
+					if separator := strings.IndexByte(credentials, ':'); separator >= 0 {
+						user = credentials[:separator]
+						password = credentials[separator+1:]
+						found = true
+						continue
+					}
+				}
+			}
+		}
+		filtered = append(filtered, header)
+	}
+	return filtered, user, password, found
 }
 
 func hasHeader(headers [][2]string, name string) bool {
