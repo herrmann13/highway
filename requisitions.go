@@ -133,6 +133,7 @@ func main() {
 	tabIndex := map[*container.TabItem]*requestTab{}
 
 	var tree *widget.Tree
+	var selectedCollection string
 
 	sync := func(rt *requestTab) {
 		newName := rt.name
@@ -418,6 +419,10 @@ func main() {
 	tree.OpenAllBranches()
 
 	tree.OnSelected = func(uid string) {
+		if strings.HasPrefix(uid, "col:") {
+			selectedCollection = strings.TrimPrefix(uid, "col:")
+			return
+		}
 		if !strings.HasPrefix(uid, "req:") {
 			return
 		}
@@ -427,6 +432,7 @@ func main() {
 			return
 		}
 		colName := rest[:idx]
+		selectedCollection = colName
 		reqName := rest[idx+1:]
 		for _, c := range collections {
 			if c.Name != colName {
@@ -462,7 +468,83 @@ func main() {
 		d.Show()
 	})
 
-	actionBar := container.NewHBox(newCollectionButton)
+	var showCurlImportDialog func()
+	showCurlImportDialog = func() {
+		if len(collections) == 0 {
+			dialog.ShowInformation("Importação", "Crie uma coleção antes de importar uma requisição.", w)
+			return
+		}
+
+		collectionNames := make([]string, 0, len(collections))
+		for _, c := range collections {
+			collectionNames = append(collectionNames, c.Name)
+		}
+		destination := widget.NewSelect(collectionNames, nil)
+		if selectedCollection != "" {
+			destination.SetSelected(selectedCollection)
+		} else {
+			destination.SetSelected(collectionNames[0])
+		}
+
+		curlEntry := widget.NewMultiLineEntry()
+		curlEntry.SetMinRowsVisible(10)
+		curlEntry.SetPlaceHolder("curl https://api.exemplo.com/usuarios -H 'Accept: application/json'")
+		curlEntry.SetText(w.Clipboard().Content())
+
+		d := dialog.NewForm(
+			"Importar cURL",
+			"Importar",
+			"Cancelar",
+			[]*widget.FormItem{
+				widget.NewFormItem("Collection", destination),
+				widget.NewFormItem("Comando cURL", curlEntry),
+			},
+			func(ok bool) {
+				if !ok {
+					return
+				}
+				rd, err := parseCurl(curlEntry.Text)
+				if err != nil {
+					dialog.ShowInformation("cURL inválido", err.Error(), w)
+					return
+				}
+				for _, c := range collections {
+					if c.Name != destination.Selected {
+						continue
+					}
+					rd.Name = uniqueRequestName(c, "Importação cURL")
+					c.Requests = append(c.Requests, rd)
+					if err := saveCollection(c); err != nil {
+						c.Requests = c.Requests[:len(c.Requests)-1]
+						dialog.ShowInformation("Erro", err.Error(), w)
+						return
+					}
+					selectedCollection = c.Name
+					openTab(&rd, c.Name)
+					tree.Refresh()
+					return
+				}
+				dialog.ShowInformation("Importação", "Selecione uma collection válida para importar.", w)
+			},
+			w,
+		)
+		d.Resize(fyne.NewSize(780, 460))
+		d.Show()
+	}
+
+	var importButton *widget.Button
+	importButton = widget.NewButton("Importação", func() {
+		c := fyne.CurrentApp().Driver().CanvasForObject(importButton)
+		if c == nil {
+			return
+		}
+		item := fyne.NewMenuItem("cURL", showCurlImportDialog)
+		pop := widget.NewPopUpMenu(fyne.NewMenu("", item), c)
+		pos := fyne.CurrentApp().Driver().AbsolutePositionForObject(importButton)
+		pop.ShowAtPosition(pos.Add(fyne.NewPos(0, importButton.Size().Height)))
+	})
+
+	actionBar := container.NewHBox(newCollectionButton, importButton)
 	sidebar := container.NewBorder(actionBar, nil, nil, nil, container.NewScroll(tree))
 
 	split := container.NewHSplit(sidebar, tabs)
