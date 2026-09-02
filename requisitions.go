@@ -674,9 +674,23 @@ func runHighway(pendingImport string) {
 			return
 		}
 		item := fyne.NewMenuItem("cURL", func() { showCurlImportDialog("") })
-		pop := widget.NewPopUpMenu(fyne.NewMenu("", item), c)
+		collectionsItem := fyne.NewMenuItem("Coleções", func() {
+			showImportCollectionsDialog(w, collections, func(imported []*collection) {
+				if err := saveImportedCollections(imported); err != nil {
+					dialog.ShowError(err, w)
+					return
+				}
+				collections = append(collections, imported...)
+				tree.Refresh()
+				dialog.ShowInformation("Importar coleções", fmt.Sprintf("%d coleção(ões) importada(s).", len(imported)), w)
+			})
+		})
+		pop := widget.NewPopUpMenu(fyne.NewMenu("", item, collectionsItem), c)
 		pos := fyne.CurrentApp().Driver().AbsolutePositionForObject(importButton)
 		pop.ShowAtPosition(pos.Add(fyne.NewPos(0, importButton.Size().Height)))
+	})
+	exportButton := widget.NewButton("Exportar", func() {
+		showExportCollectionsDialog(w, collections)
 	})
 
 	var monitorCurl atomic.Bool
@@ -719,7 +733,7 @@ func runHighway(pendingImport string) {
 	updateButton.OnTapped = func() { checkForUpdates(a, w, updateButton) }
 	versionLabel := widget.NewLabel("v" + appVersion)
 	actionBar := container.NewVBox(
-		container.NewHBox(newCollectionButton, importButton),
+		container.NewHBox(newCollectionButton, importButton, exportButton),
 		container.NewHBox(updateButton, versionLabel),
 		monitorCheck,
 	)

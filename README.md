@@ -91,6 +91,10 @@ git tag v0.2.0
 git push origin v0.2.0
 ```
 
+## Exportação e importação
+
+Use `Exportar` na barra lateral para selecionar coleções e salvar um arquivo JSON com suas rotas e variáveis. Para restaurar em outro computador, abra o menu `Importação` e selecione `Coleções`. A importação é aditiva e não remove dados existentes; nomes duplicados recebem automaticamente um sufixo, como `API (2)`.
+
 ## Testes
 
 ```bash
