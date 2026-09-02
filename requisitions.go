@@ -7,6 +7,7 @@ import (
 	"crypto/rand"
 	"crypto/sha1"
 	"crypto/sha256"
+	_ "embed"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
@@ -32,6 +33,9 @@ import (
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 )
+
+//go:embed assets/highway.png
+var highwayIconPNG []byte
 
 type kvPair struct {
 	key   *variableEntry
@@ -157,6 +161,7 @@ func main() {
 
 func runHighway(pendingImport string) {
 	a := app.NewWithID("com.herrmann.highway")
+	a.SetIcon(fyne.NewStaticResource("highway.png", highwayIconPNG))
 	a.Settings().SetTheme(theme.DarkTheme())
 	w := a.NewWindow("Highway")
 
