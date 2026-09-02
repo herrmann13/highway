@@ -1,6 +1,6 @@
 Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Upstream-Name: Highway
-Source: https://github.com/herrmann13/GO
+Source: https://github.com/herrmann13/highway
 
 Files: *
 Copyright: 2026 Herrmann

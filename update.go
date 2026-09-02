@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	githubRepository = "herrmann13/GO"
+	githubRepository = "herrmann13/highway"
 	githubAPIBase    = "https://api.github.com/repos/" + githubRepository + "/releases/latest"
 	updateTimeout    = 20 * time.Second
 )
