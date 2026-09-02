@@ -12,8 +12,8 @@ jobs:
   linux:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
       - name: Install Linux build dependencies
@@ -35,8 +35,8 @@ jobs:
             arch: arm64
     runs-on: ${{ matrix.runner }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
       - name: Set application version
@@ -54,6 +54,7 @@ jobs:
     needs: [linux, macos]
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v5
       - uses: actions/download-artifact@v4
         with:
           path: release
@@ -61,4 +62,5 @@ jobs:
       - name: Generate checksums and publish release
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
         run: cd release && sha256sum highway_*_amd64.deb Highway-*-macos-*.zip > SHA256SUMS && gh release create "$GITHUB_REF_NAME" --generate-notes highway_*_amd64.deb Highway-*-macos-*.zip SHA256SUMS

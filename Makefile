@@ -16,7 +16,9 @@ DEB_ROOT := $(DIST)/deb/$(PACKAGE)_$(DEB_VERSION)_amd64
 macos: icon
 	mkdir -p $(DIST)
 	rm -rf $(DIST)/$(APP).app $(APP).app
-	GOFLAGS='-ldflags=$(LDFLAGS)' $(FYNE) package -os darwin -name $(APP) -appID $(APP_ID) -icon $(ICON_PNG)
+	go build -ldflags "$(LDFLAGS)" -o $(APP) .
+	$(FYNE) package -os darwin -name $(APP) -appID $(APP_ID) -icon $(ICON_PNG)
+	rm -f $(APP)
 	mv $(APP).app $(DIST)/$(APP).app
 
 macos-service:
