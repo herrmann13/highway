@@ -25,6 +25,12 @@ Highway é um cliente HTTP desktop, leve e nativo (construído em Go com [Fyne](
 - **Detecção automática via área de transferência**: ao copiar um comando `curl`, o Highway pode identificar o conteúdo automaticamente.
 - Comunicação entre instâncias via socket Unix local, garantindo que apenas uma instância do app rode por vez e que novas importações sejam roteadas para a janela já aberta.
 
+### Atualizações
+- **Verificação manual de atualizações**: o botão `Verificar atualizações`, na barra lateral, exibe a versão em uso e consulta a última release publicada no GitHub.
+- **Instalação verificada**: o Highway seleciona o instalador do sistema atual, valida seu SHA-256 publicado na release e pede confirmação antes de instalar.
+- **Linux**: instala o pacote `.deb` com autorização do sistema.
+- **macOS**: substitui o aplicativo instalado após o Highway ser fechado; a instalação em `/Applications` solicita autorização administrativa.
+
 ### Armazenamento
 - Coleções, requisições e variáveis são salvas como arquivos JSON no diretório de configuração do usuário, sem dependência de servidor ou conta.
 - Migração automática de coleções de versões/nomes anteriores do projeto.
@@ -49,13 +55,22 @@ make macos-service
 
 ### Linux (Ubuntu/Debian x86_64)
 
+Para gerar um pacote Debian instalável pelo sistema:
+
 ```bash
 sudo apt update
 sudo apt install -y build-essential libgl1-mesa-dev xorg-dev libxkbcommon-dev librsvg2-bin
-make linux
+make deb
+sudo apt install ./dist/highway_0.1.0-1_amd64.deb
 ```
 
-Gera `dist/highway-linux-amd64.tar.gz`, contendo o binário, o lançador `highway.desktop` e o ícone. Para instalar apenas para o usuário atual:
+O pacote instala o binário em `/usr/bin/highway`, o lançador no menu de aplicativos e o ícone do Highway. Para remover:
+
+```bash
+sudo apt remove highway
+```
+
+Para distribuição portátil, `make linux` gera `dist/highway-linux-amd64.tar.gz`, contendo o binário, o lançador `highway.desktop` e o ícone. Para instalar apenas para o usuário atual:
 
 ```bash
 mkdir -p ~/.local/bin ~/.local/share/applications ~/.local/share/icons/hicolor/512x512/apps
@@ -67,6 +82,15 @@ chmod +x ~/.local/bin/highway
 
 Garanta que `~/.local/bin` esteja no `PATH` e abra o Highway pelo menu de aplicativos ou com `highway` no terminal.
 
+## Releases
+
+Publicar uma tag no formato `vMAJOR.MINOR.PATCH` aciona o workflow de release do GitHub. Ele gera os pacotes macOS para Intel e Apple Silicon, o `.deb` para Linux x86_64 e o arquivo `SHA256SUMS` usado pelo atualizador.
+
+```bash
+git tag v0.2.0
+git push origin v0.2.0
+```
+
 ## Testes
 
 ```bash
@@ -76,4 +100,4 @@ make test
 ## Stack técnica
 
 - **Go** + **[Fyne](https://fyne.io)** para a interface gráfica nativa multiplataforma.
-- Empacotamento nativo para macOS (`.app`) e Linux (binário + `.desktop`), via `fyne package` e Makefile.
+- Empacotamento nativo para macOS (`.app`) e Linux (`.deb` ou binário + `.desktop`), via `fyne package` e Makefile.

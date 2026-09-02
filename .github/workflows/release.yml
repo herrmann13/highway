@@ -1,0 +1,64 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Install Linux build dependencies
+        run: sudo apt-get update && sudo apt-get install -y libgl1-mesa-dev xorg-dev libxkbcommon-dev librsvg2-bin
+      - name: Build Debian package
+        run: make deb VERSION="${GITHUB_REF_NAME#v}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-amd64
+          path: dist/highway_*_amd64.deb
+
+  macos:
+    strategy:
+      matrix:
+        include:
+          - runner: macos-13
+            arch: amd64
+          - runner: macos-14
+            arch: arm64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Set application version
+        run: perl -0pi -e 's/^Version = ".*"/Version = "${{ github.ref_name }}"/m; s/Version = "v/Version = "/' FyneApp.toml
+      - name: Build macOS application
+        run: make macos VERSION="${GITHUB_REF_NAME#v}"
+      - name: Archive application
+        run: ditto -c -k --sequesterRsrc --keepParent dist/Highway.app "Highway-${GITHUB_REF_NAME#v}-macos-${{ matrix.arch }}.zip"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-${{ matrix.arch }}
+          path: Highway-*.zip
+
+  publish:
+    needs: [linux, macos]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: release
+          merge-multiple: true
+      - name: Generate checksums and publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: cd release && sha256sum highway_*_amd64.deb Highway-*-macos-*.zip > SHA256SUMS && gh release create "$GITHUB_REF_NAME" --generate-notes highway_*_amd64.deb Highway-*-macos-*.zip SHA256SUMS

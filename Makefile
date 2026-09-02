@@ -1,16 +1,22 @@
 APP := Highway
 APP_ID := com.herrmann.highway
+PACKAGE := highway
+VERSION ?= 0.1.0
+DEB_REVISION ?= 1
+DEB_VERSION := $(VERSION)-$(DEB_REVISION)
 DIST := dist
 ICON_SVG := assets/highway.svg
 ICON_PNG := assets/highway.png
 FYNE := go run fyne.io/tools/cmd/fyne@latest
+LDFLAGS := -X main.appVersion=$(VERSION)
+DEB_ROOT := $(DIST)/deb/$(PACKAGE)_$(DEB_VERSION)_amd64
 
-.PHONY: macos macos-service linux icon clean test
+.PHONY: macos macos-service linux deb icon clean test
 
 macos: icon
 	mkdir -p $(DIST)
 	rm -rf $(DIST)/$(APP).app $(APP).app
-	$(FYNE) package -os darwin -name $(APP) -appID $(APP_ID) -icon $(ICON_PNG)
+	GOFLAGS='-ldflags=$(LDFLAGS)' $(FYNE) package -os darwin -name $(APP) -appID $(APP_ID) -icon $(ICON_PNG)
 	mv $(APP).app $(DIST)/$(APP).app
 
 macos-service:
@@ -21,10 +27,26 @@ linux: icon
 		echo "Execute 'make linux' em uma maquina Linux x86_64."; exit 1; \
 	fi
 	mkdir -p $(DIST)
-	go build -o $(DIST)/highway .
+	go build -ldflags "$(LDFLAGS)" -o $(DIST)/highway .
 	cp packaging/highway.desktop $(DIST)/highway.desktop
 	cp $(ICON_PNG) $(DIST)/highway.png
 	tar -czf $(DIST)/highway-linux-amd64.tar.gz -C $(DIST) highway highway.desktop highway.png
+
+deb: icon
+	@if [ "$$(go env GOOS)" != "linux" ] || [ "$$(go env GOARCH)" != "amd64" ]; then \
+		echo "Execute 'make deb' em uma maquina Linux x86_64."; exit 1; \
+	fi
+	rm -rf $(DEB_ROOT)
+	install -d $(DEB_ROOT)/usr/bin
+	go build -ldflags "$(LDFLAGS)" -o $(DEB_ROOT)/usr/bin/$(PACKAGE) .
+	install -D -m 0644 packaging/highway.desktop $(DEB_ROOT)/usr/share/applications/$(PACKAGE).desktop
+	install -D -m 0644 $(ICON_PNG) $(DEB_ROOT)/usr/share/icons/hicolor/512x512/apps/$(PACKAGE).png
+	install -D -m 0644 packaging/debian/control.in $(DEB_ROOT)/DEBIAN/control
+	sed -i 's/@VERSION@/$(DEB_VERSION)/' $(DEB_ROOT)/DEBIAN/control
+	install -D -m 0644 packaging/debian/copyright $(DEB_ROOT)/usr/share/doc/$(PACKAGE)/copyright
+	install -D -m 0644 packaging/debian/changelog $(DEB_ROOT)/usr/share/doc/$(PACKAGE)/changelog.Debian
+	gzip -n -f $(DEB_ROOT)/usr/share/doc/$(PACKAGE)/changelog.Debian
+	dpkg-deb --build --root-owner-group $(DEB_ROOT) $(DIST)/$(PACKAGE)_$(DEB_VERSION)_amd64.deb
 
 icon:
 	@if command -v sips >/dev/null 2>&1; then \

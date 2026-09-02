@@ -710,7 +710,14 @@ func runHighway(pendingImport string) {
 		}
 	}()
 
-	actionBar := container.NewVBox(container.NewHBox(newCollectionButton, importButton), monitorCheck)
+	updateButton := widget.NewButton("Verificar atualizações", nil)
+	updateButton.OnTapped = func() { checkForUpdates(a, w, updateButton) }
+	versionLabel := widget.NewLabel("v" + appVersion)
+	actionBar := container.NewVBox(
+		container.NewHBox(newCollectionButton, importButton),
+		container.NewHBox(updateButton, versionLabel),
+		monitorCheck,
+	)
 	sidebar := container.NewBorder(actionBar, nil, nil, nil, container.NewScroll(tree))
 
 	split := container.NewHSplit(sidebar, tabs)

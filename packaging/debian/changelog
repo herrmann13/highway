@@ -1,0 +1,5 @@
+highway (0.1.0-1) unstable; urgency=medium
+
+  * Initial Debian package.
+
+ -- Herrmann  <herrmann@localhost>  Wed, 02 Sep 2026 00:00:00 +0000

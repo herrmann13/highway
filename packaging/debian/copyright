@@ -1,0 +1,8 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: Highway
+Source: https://github.com/herrmann13/GO
+
+Files: *
+Copyright: 2026 Herrmann
+License: proprietary
+ This package is distributed under the terms specified by the project owner.

@@ -1,0 +1,10 @@
+Package: highway
+Version: @VERSION@
+Section: net
+Priority: optional
+Architecture: amd64
+Depends: libgl1, libx11-6, libxcursor1, libxi6, libxinerama1, libxkbcommon0, libxrandr2
+Maintainer: Herrmann
+Description: Native desktop HTTP client for APIs
+ Highway is a lightweight API client for organizing, editing, and executing
+ HTTP requests.
