@@ -59,7 +59,7 @@ Para gerar um pacote Debian instalável pelo sistema:
 
 ```bash
 sudo apt update
-sudo apt install -y build-essential libgl1-mesa-dev xorg-dev libxkbcommon-dev librsvg2-bin
+sudo apt install -y build-essential libgl1-mesa-dev xorg-dev libxkbcommon-dev libwayland-dev librsvg2-bin
 make deb
 sudo apt install ./dist/highway_0.1.0-1_amd64.deb
 ```
