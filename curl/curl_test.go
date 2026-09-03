@@ -1,9 +1,9 @@
-package main
+package curl
 
 import "testing"
 
 func TestParseCurlJSONPost(t *testing.T) {
-	rd, err := parseCurl(`curl -X POST 'https://api.example.com/users?active=true' -H 'Content-Type: application/json' -H 'X-Token: abc' -d '{"name":"Ana"}'`)
+	rd, err := ParseCurl(`curl -X POST 'https://api.example.com/users?active=true' -H 'Content-Type: application/json' -H 'X-Token: abc' -d '{"name":"Ana"}'`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -19,7 +19,7 @@ func TestParseCurlJSONPost(t *testing.T) {
 }
 
 func TestParseCurlGetWithData(t *testing.T) {
-	rd, err := parseCurl(`curl -G https://api.example.com/search -d 'term=golang' --data-urlencode 'page=2'`)
+	rd, err := ParseCurl(`curl -G https://api.example.com/search -d 'term=golang' --data-urlencode 'page=2'`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -32,7 +32,7 @@ func TestParseCurlGetWithData(t *testing.T) {
 }
 
 func TestParseCurlMultipartAndBasicAuth(t *testing.T) {
-	rd, err := parseCurl("curl --user ana:segredo -F 'title=Relatório' -F 'status=draft' https://api.example.com/documents")
+	rd, err := ParseCurl("curl --user ana:segredo -F 'title=Relatório' -F 'status=draft' https://api.example.com/documents")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -48,7 +48,7 @@ func TestParseCurlMultipartAndBasicAuth(t *testing.T) {
 }
 
 func TestParseCurlBearerAuth(t *testing.T) {
-	rd, err := parseCurl(`curl https://api.example.com/users -H 'accept: application/json' -H 'authorization: Bearer eyJhbGciOiJIUzI1NiJ9'`)
+	rd, err := ParseCurl(`curl https://api.example.com/users -H 'accept: application/json' -H 'authorization: Bearer eyJhbGciOiJIUzI1NiJ9'`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -61,7 +61,7 @@ func TestParseCurlBearerAuth(t *testing.T) {
 }
 
 func TestParseCurlBasicHeaderAuth(t *testing.T) {
-	rd, err := parseCurl(`curl https://api.example.com/users -H 'Authorization: Basic YW5hOnNlY3JldG86c2VuaGE='`)
+	rd, err := ParseCurl(`curl https://api.example.com/users -H 'Authorization: Basic YW5hOnNlY3JldG86c2VuaGE='`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -74,7 +74,7 @@ func TestParseCurlBasicHeaderAuth(t *testing.T) {
 }
 
 func TestParseCurlInvalidBasicHeaderIsPreserved(t *testing.T) {
-	rd, err := parseCurl(`curl https://api.example.com/users -H 'Authorization: Basic inválido'`)
+	rd, err := ParseCurl(`curl https://api.example.com/users -H 'Authorization: Basic inválido'`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -84,7 +84,7 @@ func TestParseCurlInvalidBasicHeaderIsPreserved(t *testing.T) {
 }
 
 func TestParseCurlOAuth2Bearer(t *testing.T) {
-	rd, err := parseCurl(`curl --oauth2-bearer '{{token}}' https://api.example.com/users`)
+	rd, err := ParseCurl(`curl --oauth2-bearer '{{token}}' https://api.example.com/users`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -94,7 +94,7 @@ func TestParseCurlOAuth2Bearer(t *testing.T) {
 }
 
 func TestParseCurlMultilineAndErrors(t *testing.T) {
-	rd, err := parseCurl(`curl \
+	rd, err := ParseCurl(`curl \
   --url https://api.example.com/items \
   --data-urlencode 'filter=em aberto'`)
 	if err != nil {
@@ -103,7 +103,7 @@ func TestParseCurlMultilineAndErrors(t *testing.T) {
 	if rd.Method != "POST" || rd.BodyType != "x-www-form-urlencoded" || len(rd.Form) != 1 {
 		t.Fatalf("formulário incorreto: %#v", rd)
 	}
-	if _, err := parseCurl("curl --proxy localhost https://api.example.com"); err == nil {
+	if _, err := ParseCurl("curl --proxy localhost https://api.example.com"); err == nil {
 		t.Fatal("esperava erro para opção não suportada")
 	}
 }

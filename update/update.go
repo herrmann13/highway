@@ -1,4 +1,4 @@
-package main
+package update
 
 import (
 	"context"
@@ -12,6 +12,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"highway/version"
 )
 
 const (
@@ -20,79 +22,79 @@ const (
 	updateTimeout    = 20 * time.Second
 )
 
-type githubRelease struct {
+type GithubRelease struct {
 	TagName string         `json:"tag_name"`
 	HTMLURL string         `json:"html_url"`
 	Body    string         `json:"body"`
-	Assets  []releaseAsset `json:"assets"`
+	Assets  []ReleaseAsset `json:"assets"`
 }
 
-type releaseAsset struct {
+type ReleaseAsset struct {
 	Name               string `json:"name"`
 	BrowserDownloadURL string `json:"browser_download_url"`
 }
 
-type semanticVersion struct {
+type SemanticVersion struct {
 	major int
 	minor int
 	patch int
 }
 
-func fetchLatestRelease(ctx context.Context) (githubRelease, error) {
+func FetchLatestRelease(ctx context.Context) (GithubRelease, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, githubAPIBase, nil)
 	if err != nil {
-		return githubRelease{}, err
+		return GithubRelease{}, err
 	}
 	req.Header.Set("Accept", "application/vnd.github+json")
-	req.Header.Set("User-Agent", "Highway/"+appVersion)
+	req.Header.Set("User-Agent", "Highway/"+version.AppVersion)
 
 	client := &http.Client{Timeout: updateTimeout}
 	resp, err := client.Do(req)
 	if err != nil {
-		return githubRelease{}, fmt.Errorf("não foi possível consultar atualizações: %w", err)
+		return GithubRelease{}, fmt.Errorf("não foi possível consultar atualizações: %w", err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return githubRelease{}, fmt.Errorf("GitHub retornou %s ao consultar atualizações", resp.Status)
+		return GithubRelease{}, fmt.Errorf("GitHub retornou %s ao consultar atualizações", resp.Status)
 	}
 
-	var release githubRelease
+	var release GithubRelease
 	if err := json.NewDecoder(io.LimitReader(resp.Body, 2*1024*1024)).Decode(&release); err != nil {
-		return githubRelease{}, fmt.Errorf("resposta de atualização inválida: %w", err)
+		return GithubRelease{}, fmt.Errorf("resposta de atualização inválida: %w", err)
 	}
-	if _, err := parseSemanticVersion(release.TagName); err != nil {
-		return githubRelease{}, fmt.Errorf("a release do GitHub tem uma versão inválida: %w", err)
+	if _, err := ParseSemanticVersion(release.TagName); err != nil {
+		return GithubRelease{}, fmt.Errorf("a release do GitHub tem uma versão inválida: %w", err)
 	}
 	return release, nil
 }
 
-func parseSemanticVersion(raw string) (semanticVersion, error) {
+func ParseSemanticVersion(raw string) (SemanticVersion, error) {
 	raw = strings.TrimPrefix(strings.TrimSpace(raw), "v")
 	parts := strings.Split(raw, ".")
 	if len(parts) != 3 {
-		return semanticVersion{}, fmt.Errorf("%q", raw)
+		return SemanticVersion{}, fmt.Errorf("%q", raw)
 	}
-	version := semanticVersion{}
+	version := SemanticVersion{}
 	values := []*int{&version.major, &version.minor, &version.patch}
 	for i, part := range parts {
 		if part == "" {
-			return semanticVersion{}, fmt.Errorf("%q", raw)
+			return SemanticVersion{}, fmt.Errorf("%q", raw)
 		}
 		for _, char := range part {
 			if char < '0' || char > '9' {
-				return semanticVersion{}, fmt.Errorf("%q", raw)
+				return SemanticVersion{}, fmt.Errorf("%q", raw)
 			}
 		}
 		var value int
 		if _, err := fmt.Sscanf(part, "%d", &value); err != nil {
-			return semanticVersion{}, fmt.Errorf("%q", raw)
+			return SemanticVersion{}, fmt.Errorf("%q", raw)
 		}
 		*values[i] = value
 	}
 	return version, nil
 }
 
-func (v semanticVersion) newerThan(other semanticVersion) bool {
+func (v SemanticVersion) NewerThan(other SemanticVersion) bool {
 	if v.major != other.major {
 		return v.major > other.major
 	}
@@ -102,7 +104,7 @@ func (v semanticVersion) newerThan(other semanticVersion) bool {
 	return v.patch > other.patch
 }
 
-func releaseAssetForPlatform(release githubRelease, goos, goarch string) (releaseAsset, error) {
+func ReleaseAssetForPlatform(release GithubRelease, goos, goarch string) (ReleaseAsset, error) {
 	var suffix string
 	switch goos {
 	case "linux":
@@ -110,31 +112,31 @@ func releaseAssetForPlatform(release githubRelease, goos, goarch string) (releas
 	case "darwin":
 		suffix = "-macos-" + goarch + ".dmg"
 	default:
-		return releaseAsset{}, fmt.Errorf("atualização não suportada em %s", goos)
+		return ReleaseAsset{}, fmt.Errorf("atualização não suportada em %s", goos)
 	}
 	for _, asset := range release.Assets {
 		if strings.HasSuffix(asset.Name, suffix) {
 			return asset, nil
 		}
 	}
-	return releaseAsset{}, fmt.Errorf("a release não possui instalador para %s/%s", goos, goarch)
+	return ReleaseAsset{}, fmt.Errorf("a release não possui instalador para %s/%s", goos, goarch)
 }
 
-func checksumAsset(release githubRelease) (releaseAsset, error) {
+func checksumAsset(release GithubRelease) (ReleaseAsset, error) {
 	for _, asset := range release.Assets {
 		if asset.Name == "SHA256SUMS" {
 			return asset, nil
 		}
 	}
-	return releaseAsset{}, fmt.Errorf("a release não possui o arquivo SHA256SUMS")
+	return ReleaseAsset{}, fmt.Errorf("a release não possui o arquivo SHA256SUMS")
 }
 
-func downloadAsset(ctx context.Context, asset releaseAsset) (string, error) {
+func DownloadAsset(ctx context.Context, asset ReleaseAsset) (string, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, asset.BrowserDownloadURL, nil)
 	if err != nil {
 		return "", err
 	}
-	req.Header.Set("User-Agent", "Highway/"+appVersion)
+	req.Header.Set("User-Agent", "Highway/"+version.AppVersion)
 	client := &http.Client{Timeout: updateTimeout}
 	resp, err := client.Do(req)
 	if err != nil {
@@ -165,7 +167,7 @@ func downloadAsset(ctx context.Context, asset releaseAsset) (string, error) {
 	return path, nil
 }
 
-func verifyAssetChecksum(ctx context.Context, release githubRelease, asset releaseAsset, path string) error {
+func VerifyAssetChecksum(ctx context.Context, release GithubRelease, asset ReleaseAsset, path string) error {
 	checksums, err := checksumAsset(release)
 	if err != nil {
 		return err
@@ -174,7 +176,7 @@ func verifyAssetChecksum(ctx context.Context, release githubRelease, asset relea
 	if err != nil {
 		return err
 	}
-	req.Header.Set("User-Agent", "Highway/"+appVersion)
+	req.Header.Set("User-Agent", "Highway/"+version.AppVersion)
 	resp, err := (&http.Client{Timeout: updateTimeout}).Do(req)
 	if err != nil {
 		return fmt.Errorf("não foi possível baixar os checksums: %w", err)
@@ -187,7 +189,7 @@ func verifyAssetChecksum(ctx context.Context, release githubRelease, asset relea
 	if err != nil {
 		return err
 	}
-	expected, err := checksumForAsset(string(data), asset.Name)
+	expected, err := ChecksumForAsset(string(data), asset.Name)
 	if err != nil {
 		return err
 	}
@@ -207,7 +209,7 @@ func verifyAssetChecksum(ctx context.Context, release githubRelease, asset relea
 	return nil
 }
 
-func checksumForAsset(content, name string) (string, error) {
+func ChecksumForAsset(content, name string) (string, error) {
 	for _, line := range strings.Split(content, "\n") {
 		fields := strings.Fields(line)
 		if len(fields) != 2 || fields[1] != name {

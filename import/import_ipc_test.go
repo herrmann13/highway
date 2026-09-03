@@ -1,4 +1,4 @@
-package main
+package importer
 
 import (
 	"fmt"
@@ -10,14 +10,14 @@ import (
 )
 
 func TestImportCommandFromArgs(t *testing.T) {
-	command, handled, err := importCommandFromArgs([]string{"import", "--curl-stdin"}, strings.NewReader("curl https://api.example.com/users"))
+	command, handled, err := ImportCommandFromArgs([]string{"import", "--curl-stdin"}, strings.NewReader("curl https://api.example.com/users"))
 	if err != nil || !handled || command != "curl https://api.example.com/users" {
 		t.Fatalf("comando inválido: %q, %t, %v", command, handled, err)
 	}
-	if _, handled, err := importCommandFromArgs([]string{"import", "--curl-stdin"}, strings.NewReader("texto")); !handled || err == nil {
+	if _, handled, err := ImportCommandFromArgs([]string{"import", "--curl-stdin"}, strings.NewReader("texto")); !handled || err == nil {
 		t.Fatal("texto não-cURL foi aceito")
 	}
-	if _, handled, err := importCommandFromArgs(nil, strings.NewReader("")); handled || err != nil {
+	if _, handled, err := ImportCommandFromArgs(nil, strings.NewReader("")); handled || err != nil {
 		t.Fatal("modo GUI foi tratado como comando CLI")
 	}
 }
@@ -27,7 +27,7 @@ func TestImportFileFromArgsReadsAndRemovesFile(t *testing.T) {
 	if err := os.WriteFile(path, []byte("curl https://api.example.com/users"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	command, handled, err := importFileFromArgs([]string{"--import-file", path})
+	command, handled, err := ImportFileFromArgs([]string{"--import-file", path})
 	if err != nil || !handled || command != "curl https://api.example.com/users" {
 		t.Fatalf("arquivo de importação inválido: %q, %t, %v", command, handled, err)
 	}

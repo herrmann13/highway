@@ -1,4 +1,4 @@
-package main
+package variable
 
 import "testing"
 
@@ -17,15 +17,15 @@ func TestInsertVariablePlaceholder(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		got, cursor := insertVariablePlaceholder(test.text, test.offset, test.name)
+		got, cursor := InsertVariablePlaceholder(test.text, test.offset, test.name)
 		if got != test.want || cursor != test.cursor {
-			t.Errorf("insertVariablePlaceholder(%q, %d, %q) = (%q, %d), want (%q, %d)", test.text, test.offset, test.name, got, cursor, test.want, test.cursor)
+			t.Errorf("InsertVariablePlaceholder(%q, %d, %q) = (%q, %d), want (%q, %d)", test.text, test.offset, test.name, got, cursor, test.want, test.cursor)
 		}
 	}
 }
 
 func TestCursorPositionAtOffset(t *testing.T) {
-	row, column := cursorPositionAtOffset("one\ntwo", 6)
+	row, column := CursorPositionAtOffset("one\ntwo", 6)
 	if row != 1 || column != 2 {
 		t.Fatalf("posição = (%d, %d), want (1, 2)", row, column)
 	}

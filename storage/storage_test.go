@@ -1,4 +1,4 @@
-package main
+package storage
 
 import (
 	"os"
@@ -26,7 +26,7 @@ func TestMigrateCollectionsCopiesLegacyFilesWithoutOverwrite(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := migrateCollections(source, destination); err != nil {
+	if err := MigrateCollections(source, destination); err != nil {
 		t.Fatal(err)
 	}
 	legacy, err := os.ReadFile(filepath.Join(destination, "legacy.json"))

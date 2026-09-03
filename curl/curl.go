@@ -1,22 +1,25 @@
-package main
+package curl
 
 import (
 	"encoding/base64"
 	"fmt"
 	"net/url"
 	"strings"
+
+	"highway/request"
+	"highway/storage"
 )
 
-func parseCurl(command string) (requestData, error) {
-	args, err := splitShellArgs(command)
+func ParseCurl(command string) (storage.RequestData, error) {
+	args, err := SplitShellArgs(command)
 	if err != nil {
-		return requestData{}, err
+		return storage.RequestData{}, err
 	}
 	if len(args) == 0 || args[0] != "curl" {
-		return requestData{}, fmt.Errorf("o comando deve começar com curl")
+		return storage.RequestData{}, fmt.Errorf("o comando deve começar com curl")
 	}
 
-	rd := requestData{Type: requestTypeHTTP, Method: "GET", BodyType: "raw"}
+	rd := storage.RequestData{Type: request.HTTP, Method: "GET", BodyType: "raw"}
 	var rawData []string
 	var encodedData []string
 	forceGet := false
@@ -36,39 +39,39 @@ func parseCurl(command string) (requestData, error) {
 		case "-X", "--request":
 			value, err := nextValue(&i, arg)
 			if err != nil {
-				return requestData{}, err
+				return storage.RequestData{}, err
 			}
 			rd.Method = strings.ToUpper(value)
 		case "-H", "--header":
 			value, err := nextValue(&i, arg)
 			if err != nil {
-				return requestData{}, err
+				return storage.RequestData{}, err
 			}
 			parts := strings.SplitN(value, ":", 2)
 			if len(parts) != 2 || strings.TrimSpace(parts[0]) == "" {
-				return requestData{}, fmt.Errorf("header inválido: %q", value)
+				return storage.RequestData{}, fmt.Errorf("header inválido: %q", value)
 			}
 			rd.Headers = append(rd.Headers, [2]string{strings.TrimSpace(parts[0]), strings.TrimSpace(parts[1])})
 		case "-d", "--data", "--data-raw", "--data-binary", "--data-ascii":
 			value, err := nextValue(&i, arg)
 			if err != nil {
-				return requestData{}, err
+				return storage.RequestData{}, err
 			}
 			rawData = append(rawData, value)
 		case "--data-urlencode":
 			value, err := nextValue(&i, arg)
 			if err != nil {
-				return requestData{}, err
+				return storage.RequestData{}, err
 			}
 			encodedData = append(encodedData, value)
 		case "-F", "--form":
 			value, err := nextValue(&i, arg)
 			if err != nil {
-				return requestData{}, err
+				return storage.RequestData{}, err
 			}
 			parts := strings.SplitN(value, "=", 2)
 			if len(parts) != 2 || parts[0] == "" {
-				return requestData{}, fmt.Errorf("campo multipart inválido: %q", value)
+				return storage.RequestData{}, fmt.Errorf("campo multipart inválido: %q", value)
 			}
 			rd.Multipart = append(rd.Multipart, [2]string{parts[0], parts[1]})
 			rd.BodyType = "multipart/form-data"
@@ -77,7 +80,7 @@ func parseCurl(command string) (requestData, error) {
 		case "-u", "--user":
 			value, err := nextValue(&i, arg)
 			if err != nil {
-				return requestData{}, err
+				return storage.RequestData{}, err
 			}
 			credentials := strings.SplitN(value, ":", 2)
 			rd.Auth.AuthType = "Basic Auth"
@@ -88,23 +91,23 @@ func parseCurl(command string) (requestData, error) {
 		case "--oauth2-bearer":
 			value, err := nextValue(&i, arg)
 			if err != nil {
-				return requestData{}, err
+				return storage.RequestData{}, err
 			}
 			bearerToken = value
 		case "--url":
 			value, err := nextValue(&i, arg)
 			if err != nil {
-				return requestData{}, err
+				return storage.RequestData{}, err
 			}
 			rd.URL = value
 		case "-L", "--location", "-s", "--silent", "-k", "--insecure", "-i", "--include", "-v", "--verbose", "--compressed", "--globoff", "--fail", "--fail-with-body":
 			// These options change cURL behavior but not the HTTP request definition.
 		default:
 			if strings.HasPrefix(arg, "-") {
-				return requestData{}, fmt.Errorf("opção cURL não suportada: %s", arg)
+				return storage.RequestData{}, fmt.Errorf("opção cURL não suportada: %s", arg)
 			}
 			if rd.URL != "" {
-				return requestData{}, fmt.Errorf("mais de uma URL foi informada")
+				return storage.RequestData{}, fmt.Errorf("mais de uma URL foi informada")
 			}
 			rd.URL = arg
 		}
@@ -115,25 +118,25 @@ func parseCurl(command string) (requestData, error) {
 	}
 	var basicUser, basicPass string
 	var basicFound bool
-	rd.Headers, basicUser, basicPass, basicFound = extractBasicAuth(rd.Headers)
+	rd.Headers, basicUser, basicPass, basicFound = ExtractBasicAuth(rd.Headers)
 	if basicFound {
 		rd.Auth.AuthType = "Basic Auth"
 		rd.Auth.BasicUser = basicUser
 		rd.Auth.BasicPass = basicPass
 	}
-	rd.Headers, bearerToken, _ = extractBearerAuth(rd.Headers)
+	rd.Headers, bearerToken, _ = ExtractBearerAuth(rd.Headers)
 	if bearerToken != "" {
 		rd.Auth.AuthType = "Bearer Token"
 		rd.Auth.Token = bearerToken
 	}
 
 	if rd.URL == "" {
-		return requestData{}, fmt.Errorf("URL não encontrada no comando cURL")
+		return storage.RequestData{}, fmt.Errorf("URL não encontrada no comando cURL")
 	}
 
 	u, err := url.Parse(rd.URL)
 	if err != nil || u.Scheme == "" || u.Host == "" {
-		return requestData{}, fmt.Errorf("URL inválida: %q", rd.URL)
+		return storage.RequestData{}, fmt.Errorf("URL inválida: %q", rd.URL)
 	}
 	for key, values := range u.Query() {
 		for _, value := range values {
@@ -156,7 +159,7 @@ func parseCurl(command string) (requestData, error) {
 		for _, data := range rawData {
 			values, err := url.ParseQuery(data)
 			if err != nil {
-				return requestData{}, fmt.Errorf("dados de query inválidos: %w", err)
+				return storage.RequestData{}, fmt.Errorf("dados de query inválidos: %w", err)
 			}
 			for key, entries := range values {
 				for _, value := range entries {
@@ -177,7 +180,7 @@ func parseCurl(command string) (requestData, error) {
 
 	if !forceGet && len(rawData) > 0 {
 		rd.RawBody = strings.Join(rawData, "&")
-		if !hasHeader(rd.Headers, "Content-Type") {
+		if !HasHeader(rd.Headers, "Content-Type") {
 			rd.Headers = append(rd.Headers, [2]string{"Content-Type", "application/x-www-form-urlencoded"})
 		}
 	}
@@ -197,7 +200,7 @@ func parseCurl(command string) (requestData, error) {
 	return rd, nil
 }
 
-func extractBearerAuth(headers [][2]string) ([][2]string, string, bool) {
+func ExtractBearerAuth(headers [][2]string) ([][2]string, string, bool) {
 	filtered := make([][2]string, 0, len(headers))
 	var token string
 	found := false
@@ -218,7 +221,7 @@ func extractBearerAuth(headers [][2]string) ([][2]string, string, bool) {
 	return filtered, token, found
 }
 
-func extractBasicAuth(headers [][2]string) ([][2]string, string, string, bool) {
+func ExtractBasicAuth(headers [][2]string) ([][2]string, string, string, bool) {
 	filtered := make([][2]string, 0, len(headers))
 	var user, password string
 	found := false
@@ -244,7 +247,7 @@ func extractBasicAuth(headers [][2]string) ([][2]string, string, string, bool) {
 	return filtered, user, password, found
 }
 
-func hasHeader(headers [][2]string, name string) bool {
+func HasHeader(headers [][2]string, name string) bool {
 	for _, header := range headers {
 		if strings.EqualFold(header[0], name) {
 			return true
@@ -253,7 +256,7 @@ func hasHeader(headers [][2]string, name string) bool {
 	return false
 }
 
-func splitShellArgs(command string) ([]string, error) {
+func SplitShellArgs(command string) ([]string, error) {
 	var args []string
 	var current strings.Builder
 	quote := rune(0)

@@ -32,14 +32,25 @@ import (
 	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
+
+	"highway/backup"
+	"highway/clipboard"
+	"highway/curl"
+	"highway/import"
+	"highway/request"
+	"highway/response"
+	"highway/storage"
+	"highway/update"
+	"highway/variable"
+	"highway/version"
 )
 
 //go:embed assets/highway.png
 var highwayIconPNG []byte
 
 type kvPair struct {
-	key   *variableEntry
-	value *variableEntry
+	key   *variable.VariableEntry
+	value *variable.VariableEntry
 	row   *fyne.Container
 }
 
@@ -51,28 +62,6 @@ type responseResult struct {
 }
 
 const maxResponseBytes = 50 * 1024 * 1024
-
-type authConfig struct {
-	AuthType              string `json:"authType"`
-	Token                 string `json:"token"`
-	BasicUser             string `json:"basicUser"`
-	BasicPass             string `json:"basicPass"`
-	APIKeyName            string `json:"apiKeyName"`
-	APIKeyValue           string `json:"apiKeyValue"`
-	APIKeyLocation        string `json:"apiKeyLocation"`
-	OAuth1ConsumerKey     string `json:"oauth1ConsumerKey"`
-	OAuth1ConsumerSecret  string `json:"oauth1ConsumerSecret"`
-	OAuth1AccessToken     string `json:"oauth1AccessToken"`
-	OAuth1TokenSecret     string `json:"oauth1TokenSecret"`
-	OAuth1SignatureMethod string `json:"oauth1SignatureMethod"`
-	GrantType             string `json:"grantType"`
-	TokenURL              string `json:"tokenURL"`
-	ClientID              string `json:"clientID"`
-	ClientSecret          string `json:"clientSecret"`
-	Username              string `json:"username"`
-	Password              string `json:"password"`
-	Scope                 string `json:"scope"`
-}
 
 type renameLabel struct {
 	widget.Label
@@ -128,7 +117,7 @@ func showRenameDialog(w fyne.Window, title, current string, validate func(string
 }
 
 func main() {
-	pendingImport, handled, err := importFileFromArgs(os.Args[1:])
+	pendingImport, handled, err := importer.ImportFileFromArgs(os.Args[1:])
 	if handled {
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
@@ -137,13 +126,13 @@ func main() {
 		runHighway(pendingImport)
 		return
 	}
-	pendingImport, handled, err = importCommandFromArgs(os.Args[1:], os.Stdin)
+	pendingImport, handled, err = importer.ImportCommandFromArgs(os.Args[1:], os.Stdin)
 	if handled {
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			return
 		}
-		delivered, err := sendImportCommand(pendingImport)
+		delivered, err := importer.SendImportCommand(pendingImport)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "erro ao enviar importação para o Highway:", err)
 			return
@@ -151,7 +140,7 @@ func main() {
 		if delivered {
 			return
 		}
-		if err := launchHighwayWithImport(pendingImport); err != nil {
+		if err := importer.LaunchHighwayWithImport(pendingImport); err != nil {
 			fmt.Fprintln(os.Stderr, err)
 		}
 		return
@@ -165,9 +154,9 @@ func runHighway(pendingImport string) {
 	a.Settings().SetTheme(theme.DarkTheme())
 	w := a.NewWindow("Highway")
 
-	collections, err := loadCollections()
+	collections, err := storage.LoadCollections()
 	if err != nil {
-		collections = []*collection{}
+		collections = []*storage.Collection{}
 	}
 
 	tabs := container.NewDocTabs()
@@ -185,7 +174,7 @@ func runHighway(pendingImport string) {
 			}
 			return
 		}
-		if err := upsertRequest(collections, rt.collectionName, rt.name, rt.editor.toData(newName)); err != nil {
+		if err := storage.UpsertRequest(collections, rt.collectionName, rt.name, rt.editor.toData(newName)); err != nil {
 			dialog.ShowInformation("Erro", err.Error(), w)
 			return
 		}
@@ -206,7 +195,7 @@ func runHighway(pendingImport string) {
 		return nil
 	}
 
-	addTab := func(rd *requestData, collectionName string) *container.TabItem {
+	addTab := func(rd *storage.RequestData, collectionName string) *container.TabItem {
 		rt := newRequestTab(w, rd, collectionName, sync, variablesForCollection, func(rt *requestTab) {
 			renameRequest(rt)
 		})
@@ -216,7 +205,7 @@ func runHighway(pendingImport string) {
 		return item
 	}
 
-	openTab := func(rd *requestData, collectionName string) {
+	openTab := func(rd *storage.RequestData, collectionName string) {
 		if rd != nil && collectionName != "" {
 			for item, rt := range tabIndex {
 				if requestTabMatches(rt, collectionName, rd.Name) {
@@ -244,7 +233,7 @@ func runHighway(pendingImport string) {
 				if name == "" {
 					return fmt.Errorf("informe o nome da requisição")
 				}
-				if requestNameExists(c, name, -1) {
+				if storage.RequestNameExists(c, name, -1) {
 					return fmt.Errorf("já existe uma requisição com o nome %q", name)
 				}
 				return nil
@@ -260,9 +249,9 @@ func runHighway(pendingImport string) {
 						return
 					}
 					name := strings.TrimSpace(nameEntry.Text)
-					rd := requestData{Name: name, Type: requestTypeHTTP}
+					rd := storage.RequestData{Name: name, Type: request.HTTP}
 					c.Requests = append(c.Requests, rd)
-					if err := saveCollection(c); err != nil {
+					if err := storage.SaveCollection(c); err != nil {
 						dialog.ShowInformation("Erro", err.Error(), w)
 						return
 					}
@@ -287,7 +276,7 @@ func runHighway(pendingImport string) {
 				return nil
 			}
 			for _, c := range collections {
-				if c.Name == rt.collectionName && requestNameExists(c, name, -1) && name != oldName {
+				if c.Name == rt.collectionName && storage.RequestNameExists(c, name, -1) && name != oldName {
 					return fmt.Errorf("já existe uma requisição com o nome %q", name)
 				}
 			}
@@ -306,7 +295,7 @@ func runHighway(pendingImport string) {
 							continue
 						}
 						c.Requests[i].Name = name
-						if err := saveCollection(c); err != nil {
+						if err := storage.SaveCollection(c); err != nil {
 							c.Requests[i].Name = oldName
 							dialog.ShowInformation("Erro", err.Error(), w)
 							return
@@ -330,7 +319,7 @@ func runHighway(pendingImport string) {
 	}
 
 	renameCollectionFlow := func(oldName string) {
-		var target *collection
+		var target *storage.Collection
 		for _, c := range collections {
 			if c.Name == oldName {
 				target = c
@@ -352,7 +341,7 @@ func runHighway(pendingImport string) {
 			}
 			return nil
 		}, func(name string) {
-			if err := renameCollection(target, name); err != nil {
+			if err := storage.RenameCollection(target, name); err != nil {
 				dialog.ShowInformation("Erro", err.Error(), w)
 				return
 			}
@@ -379,7 +368,7 @@ func runHighway(pendingImport string) {
 						continue
 					}
 					c.Requests = append(c.Requests[:i], c.Requests[i+1:]...)
-					if err := saveCollection(c); err != nil {
+					if err := storage.SaveCollection(c); err != nil {
 						c.Requests = append(c.Requests, request)
 						copy(c.Requests[i+1:], c.Requests[i:len(c.Requests)-1])
 						c.Requests[i] = request
@@ -404,7 +393,7 @@ func runHighway(pendingImport string) {
 			if !ok {
 				return
 			}
-			if err := deleteCollection(colName); err != nil {
+			if err := storage.DeleteCollection(colName); err != nil {
 				dialog.ShowInformation("Erro", err.Error(), w)
 				return
 			}
@@ -424,7 +413,7 @@ func runHighway(pendingImport string) {
 	}
 
 	showCollectionVariables := func(colName string) {
-		var target *collection
+		var target *storage.Collection
 		for _, c := range collections {
 			if c.Name == colName {
 				target = c
@@ -438,17 +427,17 @@ func runHighway(pendingImport string) {
 		var pairs *[]kvPair
 		section, pairs := keyValueSection("Adicionar variável", "base_url", "https://api.exemplo.com", target.Variables, func() {
 			variables := snapshotPairs(*pairs)
-			if _, err := variableValues(variables); err != nil {
+			if _, err := variable.VariableValues(variables); err != nil {
 				dialog.ShowInformation("Variáveis", err.Error(), w)
 				return
 			}
 			previous := target.Variables
 			target.Variables = variables
-			if err := saveCollection(target); err != nil {
+			if err := storage.SaveCollection(target); err != nil {
 				target.Variables = previous
 				dialog.ShowInformation("Erro", err.Error(), w)
 			}
-		}, func() *variableEntry { return newVariableEntry(false, false, nil) })
+		}, func() *variable.VariableEntry { return variable.NewVariableEntry(false, false, nil) })
 
 		d := dialog.NewCustom("Variáveis: "+target.Name, "Fechar", section, w)
 		d.Resize(fyne.NewSize(680, 420))
@@ -491,7 +480,7 @@ func runHighway(pendingImport string) {
 			deleteButton := widget.NewButtonWithIcon("", theme.CancelIcon(), nil)
 			deleteButton.Importance = widget.LowImportance
 			return container.NewHBox(
-				widget.NewIcon(requestTypeIcon(requestTypeHTTP)),
+				widget.NewIcon(request.RequestTypeIcon(request.HTTP)),
 				newRenameLabel(),
 				layout.NewSpacer(),
 				deleteButton,
@@ -526,26 +515,26 @@ func runHighway(pendingImport string) {
 			icon := box.Objects[0].(*widget.Icon)
 			label := box.Objects[1].(*renameLabel)
 			deleteButton := box.Objects[3].(*widget.Button)
-			c, request, ok := requestForUID(collections, uid)
+			c, req, ok := requestForUID(collections, uid)
 			if !ok {
 				return
 			}
-			label.SetText(request.Name)
-			icon.SetResource(requestTypeIcon(request.Type))
+			label.SetText(req.Name)
+			icon.SetResource(request.RequestTypeIcon(req.Type))
 			label.onTapped = func() { tree.Select(uid) }
 			label.onDoubleTapped = func() {
 				for _, rt := range tabIndex {
-					if rt.collectionName == c.Name && rt.name == request.Name {
+					if rt.collectionName == c.Name && rt.name == req.Name {
 						renameRequest(rt)
 						return
 					}
 				}
-				rd := *request
+				rd := *req
 				openTab(&rd, c.Name)
 				renameRequest(tabIndex[tabs.Selected()])
 			}
 			deleteButton.OnTapped = func() {
-				deleteRequestFlow(c.Name, request.Name)
+				deleteRequestFlow(c.Name, req.Name)
 			}
 		},
 	)
@@ -595,8 +584,8 @@ func runHighway(pendingImport string) {
 				if !ok {
 					return
 				}
-				c := &collection{Name: strings.TrimSpace(nameEntry.Text)}
-				if err := saveCollection(c); err != nil {
+				c := &storage.Collection{Name: strings.TrimSpace(nameEntry.Text)}
+				if err := storage.SaveCollection(c); err != nil {
 					dialog.ShowInformation("Erro", err.Error(), w)
 					return
 				}
@@ -648,7 +637,7 @@ func runHighway(pendingImport string) {
 				if !ok {
 					return
 				}
-				rd, err := parseCurl(curlEntry.Text)
+				rd, err := curl.ParseCurl(curlEntry.Text)
 				if err != nil {
 					dialog.ShowInformation("cURL inválido", err.Error(), w)
 					return
@@ -657,9 +646,9 @@ func runHighway(pendingImport string) {
 					if c.Name != destination.Selected {
 						continue
 					}
-					rd.Name = uniqueRequestName(c, "Importação cURL")
+					rd.Name = storage.UniqueRequestName(c, "Importação cURL")
 					c.Requests = append(c.Requests, rd)
-					if err := saveCollection(c); err != nil {
+					if err := storage.SaveCollection(c); err != nil {
 						c.Requests = c.Requests[:len(c.Requests)-1]
 						dialog.ShowInformation("Erro", err.Error(), w)
 						return
@@ -685,8 +674,8 @@ func runHighway(pendingImport string) {
 		}
 		curlItem := fyne.NewMenuItem("cURL", func() { showCurlImportDialog("") })
 		collectionsItem := fyne.NewMenuItem("Coleções", func() {
-			showImportCollectionsDialog(w, collections, func(imported []*collection) {
-				if err := saveImportedCollections(imported); err != nil {
+			backup.ShowImportCollectionsDialog(w, collections, func(imported []*storage.Collection) {
+				if err := backup.SaveImportedCollections(imported); err != nil {
 					dialog.ShowError(err, w)
 					return
 				}
@@ -698,10 +687,10 @@ func runHighway(pendingImport string) {
 		importItem := fyne.NewMenuItem("Importação", nil)
 		importItem.ChildMenu = fyne.NewMenu("", curlItem, collectionsItem)
 		exportItem := fyne.NewMenuItem("Exportar", func() {
-			showExportCollectionsDialog(w, collections)
+			backup.ShowExportCollectionsDialog(w, collections)
 		})
 		updateItem := fyne.NewMenuItem("Verificar atualizações", func() {
-			checkForUpdates(a, w, optionsButton)
+			update.CheckForUpdates(a, w, optionsButton)
 		})
 		pop := widget.NewPopUpMenu(fyne.NewMenu("", importItem, exportItem, updateItem), c)
 		pos := fyne.CurrentApp().Driver().AbsolutePositionForObject(optionsButton)
@@ -720,12 +709,12 @@ func runHighway(pendingImport string) {
 	go func() {
 		ticker := time.NewTicker(time.Second)
 		defer ticker.Stop()
-		detector := &curlClipboardDetector{}
+		detector := &clipboard.CurlClipboardDetector{}
 		for range ticker.C {
 			if !monitorCurl.Load() {
 				continue
 			}
-			command, detected := detector.detect(w.Clipboard().Content())
+			command, detected := detector.Detect(w.Clipboard().Content())
 			if !detected || !curlPromptOpen.CompareAndSwap(false, true) {
 				continue
 			}
@@ -744,7 +733,7 @@ func runHighway(pendingImport string) {
 		}
 	}()
 
-	versionLabel := widget.NewLabel("v" + appVersion)
+	versionLabel := widget.NewLabel("v" + version.AppVersion)
 	actionBar := container.NewVBox(
 		container.NewHBox(optionsButton, versionLabel),
 		monitorCheck,
@@ -759,7 +748,7 @@ func runHighway(pendingImport string) {
 
 	w.SetContent(split)
 	w.Resize(fyne.NewSize(1200, 750))
-	closeImportServer, err := startImportServer(func(command string) {
+	closeImportServer, err := importer.StartImportServer(func(command string) {
 		fyne.Do(func() {
 			w.Show()
 			w.RequestFocus()
@@ -775,7 +764,7 @@ func runHighway(pendingImport string) {
 	w.ShowAndRun()
 }
 
-func treeChildUIDs(uid string, collections []*collection) []string {
+func treeChildUIDs(uid string, collections []*storage.Collection) []string {
 	if uid == "" {
 		ids := make([]string, 0, len(collections))
 		for i := range collections {
@@ -801,7 +790,7 @@ func requestUID(collectionIndex, requestIndex int) string {
 	return "req:" + strconv.Itoa(collectionIndex) + ":" + strconv.Itoa(requestIndex)
 }
 
-func collectionForUID(collections []*collection, uid string) (*collection, int, bool) {
+func collectionForUID(collections []*storage.Collection, uid string) (*storage.Collection, int, bool) {
 	if !strings.HasPrefix(uid, "col:") {
 		return nil, 0, false
 	}
@@ -812,7 +801,7 @@ func collectionForUID(collections []*collection, uid string) (*collection, int, 
 	return collections[index], index, true
 }
 
-func requestForUID(collections []*collection, uid string) (*collection, *requestData, bool) {
+func requestForUID(collections []*storage.Collection, uid string) (*storage.Collection, *storage.RequestData, bool) {
 	if !strings.HasPrefix(uid, "req:") {
 		return nil, nil, false
 	}
@@ -863,11 +852,11 @@ func sectionPanel(title string, accent, bg color.Color, content fyne.CanvasObjec
 	)
 }
 
-func showError(statusText *canvas.Text, responseBody *responseViewer, responseHeaders *widget.Entry, err error) {
+func showError(statusText *canvas.Text, responseBody *response.ResponseViewer, responseHeaders *widget.Entry, err error) {
 	statusText.Text = "Erro: " + err.Error()
 	statusText.Color = errorColor()
 	statusText.Refresh()
-	responseBody.clear()
+	responseBody.Clear()
 	responseHeaders.SetText("")
 }
 
@@ -896,7 +885,7 @@ func snapshotPairs(pairs []kvPair) [][2]string {
 	return out
 }
 
-func keyValueSection(addLabel, keyPlaceholder, valuePlaceholder string, defaults [][2]string, onChange func(), newEntry func() *variableEntry) (*fyne.Container, *[]kvPair) {
+func keyValueSection(addLabel, keyPlaceholder, valuePlaceholder string, defaults [][2]string, onChange func(), newEntry func() *variable.VariableEntry) (*fyne.Container, *[]kvPair) {
 	pairs := []kvPair{}
 	list := container.NewVBox()
 
@@ -1002,7 +991,7 @@ func buildBody(bodyType, raw string, form, mp [][2]string) (io.Reader, string, e
 	}
 }
 
-func sendRequest(method, rawURL string, params, headers [][2]string, reqBody io.Reader, contentType string, cfg authConfig) (responseResult, error) {
+func sendRequest(method, rawURL string, params, headers [][2]string, reqBody io.Reader, contentType string, cfg storage.AuthConfig) (responseResult, error) {
 	var result responseResult
 
 	u, err := url.Parse(rawURL)
@@ -1083,20 +1072,12 @@ func sendRequest(method, rawURL string, params, headers [][2]string, reqBody io.
 	result.statusCode = resp.StatusCode
 	result.duration = time.Since(start)
 	result.headers = resp.Header
-	result.body = formatResponseBody(respBody)
+	result.body = response.FormatResponseBody(respBody)
 
 	return result, nil
 }
 
-func formatResponseBody(body []byte) string {
-	var pretty bytes.Buffer
-	if json.Indent(&pretty, body, "", "  ") == nil {
-		return pretty.String()
-	}
-	return string(body)
-}
-
-func applyAuth(req *http.Request, cfg authConfig) error {
+func applyAuth(req *http.Request, cfg storage.AuthConfig) error {
 	switch cfg.AuthType {
 	case "No Auth", "":
 		return nil
@@ -1143,7 +1124,7 @@ func applyAuth(req *http.Request, cfg authConfig) error {
 	return nil
 }
 
-func fetchToken(cfg authConfig) (string, error) {
+func fetchToken(cfg storage.AuthConfig) (string, error) {
 	if strings.TrimSpace(cfg.TokenURL) == "" {
 		return "", fmt.Errorf("token URL vazia")
 	}
@@ -1197,7 +1178,7 @@ func formatHeaders(h http.Header) string {
 	return sb.String()
 }
 
-func doDigest(client *http.Client, newReq func() (*http.Request, error), method string, u *url.URL, cfg authConfig) (*http.Response, error) {
+func doDigest(client *http.Client, newReq func() (*http.Request, error), method string, u *url.URL, cfg storage.AuthConfig) (*http.Response, error) {
 	req, err := newReq()
 	if err != nil {
 		return nil, err
@@ -1316,7 +1297,7 @@ func randomHex(n int) string {
 	return hex.EncodeToString(b)
 }
 
-func buildOAuth1Header(req *http.Request, cfg authConfig) (string, error) {
+func buildOAuth1Header(req *http.Request, cfg storage.AuthConfig) (string, error) {
 	if strings.TrimSpace(cfg.OAuth1ConsumerKey) == "" {
 		return "", fmt.Errorf("consumer key vazio")
 	}

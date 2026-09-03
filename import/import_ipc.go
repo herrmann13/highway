@@ -1,4 +1,4 @@
-package main
+package importer
 
 import (
 	"crypto/sha256"
@@ -13,6 +13,9 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"highway/curl"
+	"highway/storage"
 )
 
 const maxCurlImportBytes = 2 * 1024 * 1024
@@ -25,7 +28,7 @@ type importResponse struct {
 	Error string `json:"error,omitempty"`
 }
 
-func importCommandFromArgs(args []string, input io.Reader) (string, bool, error) {
+func ImportCommandFromArgs(args []string, input io.Reader) (string, bool, error) {
 	if len(args) == 0 || args[0] != "import" {
 		return "", false, nil
 	}
@@ -46,7 +49,7 @@ func importCommandFromArgs(args []string, input io.Reader) (string, bool, error)
 	return command, true, nil
 }
 
-func importFileFromArgs(args []string) (string, bool, error) {
+func ImportFileFromArgs(args []string) (string, bool, error) {
 	if len(args) == 0 || args[0] != "--import-file" {
 		return "", false, nil
 	}
@@ -68,8 +71,8 @@ func importFileFromArgs(args []string) (string, bool, error) {
 	return command, true, nil
 }
 
-func launchHighwayWithImport(command string) error {
-	configDir, err := highwayConfigDir()
+func LaunchHighwayWithImport(command string) error {
+	configDir, err := storage.ConfigDir()
 	if err != nil {
 		return err
 	}
@@ -102,12 +105,12 @@ func launchHighwayWithImport(command string) error {
 }
 
 func isCurlCommand(command string) bool {
-	args, err := splitShellArgs(command)
+	args, err := curl.SplitShellArgs(command)
 	return err == nil && len(args) > 0 && args[0] == "curl"
 }
 
 func importSocketPath() (string, error) {
-	configDir, err := highwayConfigDir()
+	configDir, err := storage.ConfigDir()
 	if err != nil {
 		return "", err
 	}
@@ -115,7 +118,7 @@ func importSocketPath() (string, error) {
 	return filepath.Join(os.TempDir(), fmt.Sprintf("highway-%x.sock", digest[:8])), nil
 }
 
-func sendImportCommand(command string) (bool, error) {
+func SendImportCommand(command string) (bool, error) {
 	path, err := importSocketPath()
 	if err != nil {
 		return false, err
@@ -148,7 +151,7 @@ func sendImportCommandTo(path, command string) (bool, error) {
 	return true, nil
 }
 
-func startImportServer(handle func(string)) (func(), error) {
+func StartImportServer(handle func(string)) (func(), error) {
 	path, err := importSocketPath()
 	if err != nil {
 		return nil, err

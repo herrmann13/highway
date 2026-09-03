@@ -1,4 +1,4 @@
-package main
+package update
 
 import (
 	"fmt"
@@ -10,7 +10,7 @@ import (
 	"strings"
 )
 
-func installUpdate(path string) (string, error) {
+func InstallUpdate(path string) (string, error) {
 	switch runtime.GOOS {
 	case "linux":
 		return installLinuxUpdate(path)

@@ -12,26 +12,19 @@ import (
 	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
-)
 
-type requestSnapshot struct {
-	method      string
-	url         string
-	bodyType    string
-	rawBody     string
-	queryParams [][2]string
-	headers     [][2]string
-	form        [][2]string
-	multipart   [][2]string
-	auth        authConfig
-}
+	"highway/request"
+	"highway/response"
+	"highway/storage"
+	"highway/variable"
+)
 
 type requestEditor struct {
 	requestType      string
 	method           *widget.Select
-	urlEntry         *variableEntry
+	urlEntry         *variable.VariableEntry
 	bodyType         *widget.Select
-	rawBody          *variableEntry
+	rawBody          *variable.VariableEntry
 	form             *[]kvPair
 	multipart        *[]kvPair
 	headers          *[]kvPair
@@ -40,24 +33,24 @@ type requestEditor struct {
 	multipartSection *fyne.Container
 
 	authorization         *widget.Select
-	authorizationContent  *variableEntry
-	basicUserEntry        *variableEntry
-	basicPassEntry        *variableEntry
-	apiKeyNameEntry       *variableEntry
-	apiKeyValueEntry      *variableEntry
+	authorizationContent  *variable.VariableEntry
+	basicUserEntry        *variable.VariableEntry
+	basicPassEntry        *variable.VariableEntry
+	apiKeyNameEntry       *variable.VariableEntry
+	apiKeyValueEntry      *variable.VariableEntry
 	apiKeyLocation        *widget.Select
-	oauth1ConsumerKey     *variableEntry
-	oauth1ConsumerSecret  *variableEntry
-	oauth1AccessToken     *variableEntry
-	oauth1TokenSecret     *variableEntry
+	oauth1ConsumerKey     *variable.VariableEntry
+	oauth1ConsumerSecret  *variable.VariableEntry
+	oauth1AccessToken     *variable.VariableEntry
+	oauth1TokenSecret     *variable.VariableEntry
 	oauth1SignatureMethod *widget.Select
 	oauthGrantType        *widget.Select
-	oauthTokenURL         *variableEntry
-	oauthClientID         *variableEntry
-	oauthClientSecret     *variableEntry
-	oauthUsername         *variableEntry
-	oauthPassword         *variableEntry
-	oauthScope            *variableEntry
+	oauthTokenURL         *variable.VariableEntry
+	oauthClientID         *variable.VariableEntry
+	oauthClientSecret     *variable.VariableEntry
+	oauthUsername         *variable.VariableEntry
+	oauthPassword         *variable.VariableEntry
+	oauthScope            *variable.VariableEntry
 
 	basicForm  *widget.Form
 	apiKeyForm *widget.Form
@@ -67,17 +60,17 @@ type requestEditor struct {
 	tabs *container.AppTabs
 }
 
-func newRequestEditor(rd *requestData, onEdit func(), onAddVariable func(*variableEntry)) *requestEditor {
-	e := &requestEditor{requestType: requestTypeHTTP}
+func newRequestEditor(rd *storage.RequestData, onEdit func(), onAddVariable func(*variable.VariableEntry)) *requestEditor {
+	e := &requestEditor{requestType: request.HTTP}
 	if rd != nil {
-		e.requestType = normalizedRequestType(rd.Type)
+		e.requestType = request.NormalizedRequestType(rd.Type)
 	}
 
-	newEntry := func() *variableEntry { return newVariableEntry(false, false, onAddVariable) }
+	newEntry := func() *variable.VariableEntry { return variable.NewVariableEntry(false, false, onAddVariable) }
 	e.urlEntry = newEntry()
 	e.urlEntry.SetPlaceHolder("http://localhost:3000")
 
-	e.rawBody = newVariableEntry(true, false, onAddVariable)
+	e.rawBody = variable.NewVariableEntry(true, false, onAddVariable)
 	e.rawBody.SetText("{}")
 
 	e.method = widget.NewSelect(
@@ -114,13 +107,13 @@ func newRequestEditor(rd *requestData, onEdit func(), onAddVariable func(*variab
 		nil,
 	)
 
-	e.authorizationContent = newVariableEntry(true, false, onAddVariable)
+	e.authorizationContent = variable.NewVariableEntry(true, false, onAddVariable)
 	e.authorizationContent.SetMinRowsVisible(1)
 	e.authorizationContent.SetPlaceHolder("Auth Content")
 
 	e.basicUserEntry = newEntry()
 	e.basicUserEntry.SetPlaceHolder("usuário")
-	e.basicPassEntry = newVariableEntry(false, true, onAddVariable)
+	e.basicPassEntry = variable.NewVariableEntry(false, true, onAddVariable)
 	e.basicPassEntry.SetPlaceHolder("senha")
 	e.basicForm = &widget.Form{
 		Items: []*widget.FormItem{
@@ -252,7 +245,7 @@ func (e *requestEditor) wireOnEdit(onEdit func()) {
 	e.oauthScope.OnChanged = changed
 }
 
-func (e *requestEditor) applyDefaults(rd *requestData) {
+func (e *requestEditor) applyDefaults(rd *storage.RequestData) {
 	e.method.SetSelected("GET")
 	e.bodyType.SetSelected("raw")
 	e.apiKeyLocation.SetSelected("header")
@@ -347,17 +340,17 @@ func (e *requestEditor) applyAuthType(value string) {
 	}
 }
 
-func (e *requestEditor) snapshot() requestSnapshot {
-	return requestSnapshot{
-		method:      e.method.Selected,
-		url:         e.urlEntry.Text,
-		bodyType:    e.bodyType.Selected,
-		rawBody:     e.rawBody.Text,
-		queryParams: snapshotPairs(*e.params),
-		headers:     snapshotPairs(*e.headers),
-		form:        snapshotPairs(*e.form),
-		multipart:   snapshotPairs(*e.multipart),
-		auth: authConfig{
+func (e *requestEditor) snapshot() storage.RequestSnapshot {
+	return storage.RequestSnapshot{
+		Method:      e.method.Selected,
+		URL:         e.urlEntry.Text,
+		BodyType:    e.bodyType.Selected,
+		RawBody:     e.rawBody.Text,
+		QueryParams: snapshotPairs(*e.params),
+		Headers:     snapshotPairs(*e.headers),
+		Form:        snapshotPairs(*e.form),
+		Multipart:   snapshotPairs(*e.multipart),
+		Auth: storage.AuthConfig{
 			AuthType:              e.authorization.Selected,
 			Token:                 e.authorizationContent.Text,
 			BasicUser:             e.basicUserEntry.Text,
@@ -381,20 +374,20 @@ func (e *requestEditor) snapshot() requestSnapshot {
 	}
 }
 
-func (e *requestEditor) toData(name string) requestData {
+func (e *requestEditor) toData(name string) storage.RequestData {
 	s := e.snapshot()
-	return requestData{
+	return storage.RequestData{
 		Name:      name,
 		Type:      e.requestType,
-		Method:    s.method,
-		URL:       s.url,
-		BodyType:  s.bodyType,
-		RawBody:   s.rawBody,
-		Form:      s.form,
-		Multipart: s.multipart,
-		Headers:   s.headers,
-		Params:    s.queryParams,
-		Auth:      s.auth,
+		Method:    s.Method,
+		URL:       s.URL,
+		BodyType:  s.BodyType,
+		RawBody:   s.RawBody,
+		Form:      s.Form,
+		Multipart: s.Multipart,
+		Headers:   s.Headers,
+		Params:    s.QueryParams,
+		Auth:      s.Auth,
 	}
 }
 
@@ -406,7 +399,7 @@ type requestTab struct {
 	editor         *requestEditor
 	status         *canvas.Text
 	respHeaders    *widget.Entry
-	responseViewer *responseViewer
+	responseViewer *response.ResponseViewer
 	content        *fyne.Container
 	sync           func(*requestTab)
 	variables      func(string) [][2]string
@@ -425,7 +418,7 @@ func (rt *requestTab) scheduleSync() {
 	})
 }
 
-func newRequestTab(w fyne.Window, rd *requestData, collectionName string, sync func(*requestTab), variables func(string) [][2]string, onRename func(*requestTab)) *requestTab {
+func newRequestTab(w fyne.Window, rd *storage.RequestData, collectionName string, sync func(*requestTab), variables func(string) [][2]string, onRename func(*requestTab)) *requestTab {
 	name := "Nova Requisição"
 	if rd != nil && rd.Name != "" {
 		name = rd.Name
@@ -438,12 +431,12 @@ func newRequestTab(w fyne.Window, rd *requestData, collectionName string, sync f
 		variables:      variables,
 	}
 
-	rt.editor = newRequestEditor(rd, rt.scheduleSync, func(entry *variableEntry) {
+	rt.editor = newRequestEditor(rd, rt.scheduleSync, func(entry *variable.VariableEntry) {
 		var variables [][2]string
 		if rt.variables != nil {
 			variables = rt.variables(rt.collectionName)
 		}
-		showVariablePicker(w, entry, variables)
+		variable.ShowVariablePicker(w, entry, variables)
 	})
 
 	rt.nameLabel = newRenameLabel()
@@ -459,7 +452,7 @@ func newRequestTab(w fyne.Window, rd *requestData, collectionName string, sync f
 	status.TextSize = theme.TextSize()
 	rt.status = status
 
-	responseViewer := newResponseViewer()
+	responseViewer := response.NewResponseViewer()
 	respHeaders := widget.NewMultiLineEntry()
 	respHeaders.SetPlaceHolder("Headers da resposta")
 	respHeaders.Disable()
@@ -467,12 +460,12 @@ func newRequestTab(w fyne.Window, rd *requestData, collectionName string, sync f
 	rt.responseViewer = responseViewer
 
 	copyButton := widget.NewButton("Copiar", func() {
-		w.Clipboard().SetContent(responseViewer.fullBody)
+		w.Clipboard().SetContent(responseViewer.FullBody)
 	})
 	statusRow := container.NewHBox(status, layout.NewSpacer(), copyButton)
 
 	responseTabs := container.NewAppTabs(
-		container.NewTabItem("Body", responseViewer.list),
+		container.NewTabItem("Body", responseViewer.List),
 		container.NewTabItem("Headers", respHeaders),
 	)
 
@@ -483,28 +476,28 @@ func newRequestTab(w fyne.Window, rd *requestData, collectionName string, sync f
 			variables = rt.variables(rt.collectionName)
 		}
 		var err error
-		s, err = expandRequestSnapshot(s, variables)
+		s, err = variable.ExpandRequestSnapshot(s, variables)
 		if err != nil {
 			showError(status, responseViewer, respHeaders, err)
 			return
 		}
-		responseViewer.clear()
+		responseViewer.Clear()
 		status.Text = "Enviando..."
 		status.Color = theme.ForegroundColor()
 		status.Refresh()
 
 		go func() {
-			reqBody, contentType, err := buildBody(s.bodyType, s.rawBody, s.form, s.multipart)
+			reqBody, contentType, err := buildBody(s.BodyType, s.RawBody, s.Form, s.Multipart)
 			if err != nil {
 				fyne.Do(func() {
 					showError(status, responseViewer, respHeaders, err)
 				})
 				return
 			}
-			result, err := sendRequest(s.method, s.url, s.queryParams, s.headers, reqBody, contentType, s.auth)
+			result, err := sendRequest(s.Method, s.URL, s.QueryParams, s.Headers, reqBody, contentType, s.Auth)
 			var bodyLines []string
 			if err == nil {
-				bodyLines = responseLines(result.body)
+				bodyLines = response.ResponseLines(result.body)
 			}
 			fyne.Do(func() {
 				if err != nil {
@@ -519,7 +512,7 @@ func newRequestTab(w fyne.Window, rd *requestData, collectionName string, sync f
 				)
 				status.Color = statusColor(result.statusCode)
 				status.Refresh()
-				responseViewer.setResponse(result.body, bodyLines)
+				responseViewer.SetResponse(result.body, bodyLines)
 				respHeaders.SetText(formatHeaders(result.headers))
 			})
 		}()

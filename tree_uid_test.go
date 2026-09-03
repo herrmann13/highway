@@ -1,12 +1,16 @@
 package main
 
-import "testing"
+import (
+	"testing"
+
+	"highway/storage"
+)
 
 func TestTreeUIDsSupportLegacyNames(t *testing.T) {
-	collections := []*collection{
+	collections := []*storage.Collection{
 		{
 			Name: "API / Produção",
-			Requests: []requestData{
+			Requests: []storage.RequestData{
 				{Name: "Listar usuários / ativos"},
 				{Name: "Buscar relatório mensal"},
 			},
@@ -27,7 +31,7 @@ func TestTreeUIDsSupportLegacyNames(t *testing.T) {
 }
 
 func TestTreeUIDRejectsInvalidIndexes(t *testing.T) {
-	collections := []*collection{{Name: "API", Requests: []requestData{{Name: "Listar"}}}}
+	collections := []*storage.Collection{{Name: "API", Requests: []storage.RequestData{{Name: "Listar"}}}}
 	if _, _, ok := collectionForUID(collections, "col:1"); ok {
 		t.Fatal("aceitou collection fora do intervalo")
 	}

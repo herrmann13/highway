@@ -1,18 +1,20 @@
-package main
+package backup
 
 import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"highway/storage"
 )
 
 func TestExportAndReadBundle(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "highway-export.json")
-	original := []*collection{{Name: "API", Variables: [][2]string{{"base_url", "https://example.com"}}, Requests: []requestData{{Name: "Listar", Method: "GET"}}}}
-	if err := exportCollections(path, original); err != nil {
+	original := []*storage.Collection{{Name: "API", Variables: [][2]string{{"base_url", "https://example.com"}}, Requests: []storage.RequestData{{Name: "Listar", Method: "GET"}}}}
+	if err := ExportCollections(path, original); err != nil {
 		t.Fatal(err)
 	}
-	bundle, err := readBundle(path)
+	bundle, err := ReadBundle(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -27,18 +29,18 @@ func TestReadBundleRejectsInvalidFiles(t *testing.T) {
 		if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := readBundle(path); err == nil {
+		if _, err := ReadBundle(path); err == nil {
 			t.Fatalf("arquivo inválido foi aceito: %s", content)
 		}
 	}
 }
 
 func TestUniqueCollectionName(t *testing.T) {
-	collections := []*collection{{Name: "API"}, {Name: "API (2)"}}
-	if got := uniqueCollectionName(collections, "Nova"); got != "Nova" {
+	collections := []*storage.Collection{{Name: "API"}, {Name: "API (2)"}}
+	if got := UniqueCollectionName(collections, "Nova"); got != "Nova" {
 		t.Fatalf("nome inesperado: %q", got)
 	}
-	if got := uniqueCollectionName(collections, "API"); got != "API (3)" {
+	if got := UniqueCollectionName(collections, "API"); got != "API (3)" {
 		t.Fatalf("nome de conflito inesperado: %q", got)
 	}
 }

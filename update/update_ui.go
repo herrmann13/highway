@@ -1,4 +1,4 @@
-package main
+package update
 
 import (
 	"context"
@@ -10,16 +10,18 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/widget"
+
+	"highway/version"
 )
 
-func checkForUpdates(a fyne.App, w fyne.Window, button *widget.Button) {
+func CheckForUpdates(a fyne.App, w fyne.Window, button *widget.Button) {
 	button.Disable()
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), updateTimeout)
 		defer cancel()
-		release, err := fetchLatestRelease(ctx)
-		current, currentErr := parseSemanticVersion(appVersion)
-		latest, latestErr := parseSemanticVersion(release.TagName)
+		release, err := FetchLatestRelease(ctx)
+		current, currentErr := ParseSemanticVersion(version.AppVersion)
+		latest, latestErr := ParseSemanticVersion(release.TagName)
 		fyne.Do(func() {
 			button.Enable()
 			if err != nil {
@@ -30,11 +32,11 @@ func checkForUpdates(a fyne.App, w fyne.Window, button *widget.Button) {
 				dialog.ShowError(fmt.Errorf("não foi possível comparar as versões"), w)
 				return
 			}
-			if !latest.newerThan(current) {
-				dialog.ShowInformation("Atualizações", "Você já está usando a versão mais recente (v"+appVersion+").", w)
+			if !latest.NewerThan(current) {
+				dialog.ShowInformation("Atualizações", "Você já está usando a versão mais recente (v"+version.AppVersion+").", w)
 				return
 			}
-			asset, err := releaseAssetForPlatform(release, runtime.GOOS, runtime.GOARCH)
+			asset, err := ReleaseAssetForPlatform(release, runtime.GOOS, runtime.GOARCH)
 			if err != nil {
 				dialog.ShowError(err, w)
 				return
@@ -45,24 +47,24 @@ func checkForUpdates(a fyne.App, w fyne.Window, button *widget.Button) {
 			}
 			dialog.ShowConfirm("Atualização disponível", message, func(ok bool) {
 				if ok {
-					downloadAndInstallUpdate(a, w, button, release, asset)
+					DownloadAndInstallUpdate(a, w, button, release, asset)
 				}
 			}, w)
 		})
 	}()
 }
 
-func downloadAndInstallUpdate(a fyne.App, w fyne.Window, button *widget.Button, release githubRelease, asset releaseAsset) {
+func DownloadAndInstallUpdate(a fyne.App, w fyne.Window, button *widget.Button, release GithubRelease, asset ReleaseAsset) {
 	button.Disable()
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*updateTimeout)
 		defer cancel()
-		path, err := downloadAsset(ctx, asset)
+		path, err := DownloadAsset(ctx, asset)
 		if err == nil {
-			err = verifyAssetChecksum(ctx, release, asset, path)
+			err = VerifyAssetChecksum(ctx, release, asset, path)
 		}
 		if err == nil {
-			_, err = installUpdate(path)
+			_, err = InstallUpdate(path)
 		}
 		if err != nil {
 			_ = os.Remove(path)

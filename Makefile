@@ -9,7 +9,7 @@ DIST := dist
 ICON_SVG := assets/highway.svg
 ICON_PNG := $(DIST)/highway.png
 FYNE := go run fyne.io/tools/cmd/fyne@latest
-LDFLAGS := -X main.appVersion=$(VERSION)
+LDFLAGS := -X highway/version.AppVersion=$(VERSION)
 DEB_ROOT := $(DIST)/deb/$(PACKAGE)_$(DEB_VERSION)_amd64
 DMG_STAGE := $(DIST)/dmg
 DMG := $(DIST)/$(APP)-$(VERSION)-macos-$(ARCH).dmg

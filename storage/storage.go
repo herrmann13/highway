@@ -1,4 +1,4 @@
-package main
+package storage
 
 import (
 	"encoding/json"
@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-type requestData struct {
+type RequestData struct {
 	Name      string      `json:"name"`
 	Type      string      `json:"type"`
 	Method    string      `json:"method"`
@@ -20,18 +20,52 @@ type requestData struct {
 	Multipart [][2]string `json:"multipart"`
 	Headers   [][2]string `json:"headers"`
 	Params    [][2]string `json:"params"`
-	Auth      authConfig  `json:"auth"`
+	Auth      AuthConfig  `json:"auth"`
 }
 
-type collection struct {
+type Collection struct {
 	Name      string        `json:"name"`
 	Variables [][2]string   `json:"variables"`
-	Requests  []requestData `json:"requests"`
+	Requests  []RequestData `json:"requests"`
+}
+
+type AuthConfig struct {
+	AuthType              string `json:"authType"`
+	Token                 string `json:"token"`
+	BasicUser             string `json:"basicUser"`
+	BasicPass             string `json:"basicPass"`
+	APIKeyName            string `json:"apiKeyName"`
+	APIKeyValue           string `json:"apiKeyValue"`
+	APIKeyLocation        string `json:"apiKeyLocation"`
+	OAuth1ConsumerKey     string `json:"oauth1ConsumerKey"`
+	OAuth1ConsumerSecret  string `json:"oauth1ConsumerSecret"`
+	OAuth1AccessToken     string `json:"oauth1AccessToken"`
+	OAuth1TokenSecret     string `json:"oauth1TokenSecret"`
+	OAuth1SignatureMethod string `json:"oauth1SignatureMethod"`
+	GrantType             string `json:"grantType"`
+	TokenURL              string `json:"tokenURL"`
+	ClientID              string `json:"clientID"`
+	ClientSecret          string `json:"clientSecret"`
+	Username              string `json:"username"`
+	Password              string `json:"password"`
+	Scope                 string `json:"scope"`
+}
+
+type RequestSnapshot struct {
+	Method      string
+	URL         string
+	BodyType    string
+	RawBody     string
+	QueryParams [][2]string
+	Headers     [][2]string
+	Form        [][2]string
+	Multipart   [][2]string
+	Auth        AuthConfig
 }
 
 var invalidFileChars = regexp.MustCompile(`[^a-zA-Z0-9._-]+`)
 
-func highwayConfigDir() (string, error) {
+func ConfigDir() (string, error) {
 	base, err := os.UserConfigDir()
 	if err != nil {
 		return "", err
@@ -43,8 +77,8 @@ func highwayConfigDir() (string, error) {
 	return dir, nil
 }
 
-func collectionsDir() (string, error) {
-	configDir, err := highwayConfigDir()
+func CollectionsDir() (string, error) {
+	configDir, err := ConfigDir()
 	if err != nil {
 		return "", err
 	}
@@ -53,13 +87,13 @@ func collectionsDir() (string, error) {
 		return "", err
 	}
 	base := filepath.Dir(configDir)
-	if err := migrateCollections(filepath.Join(base, "carteiro", "collections"), dir); err != nil {
+	if err := MigrateCollections(filepath.Join(base, "carteiro", "collections"), dir); err != nil {
 		return "", err
 	}
 	return dir, nil
 }
 
-func migrateCollections(sourceDir, destinationDir string) error {
+func MigrateCollections(sourceDir, destinationDir string) error {
 	entries, err := os.ReadDir(sourceDir)
 	if os.IsNotExist(err) {
 		return nil
@@ -88,13 +122,13 @@ func migrateCollections(sourceDir, destinationDir string) error {
 	return nil
 }
 
-func collectionFilePath(dir, name string) string {
+func CollectionFilePath(dir, name string) string {
 	safe := invalidFileChars.ReplaceAllString(name, "_")
 	return filepath.Join(dir, safe+".json")
 }
 
-func loadCollections() ([]*collection, error) {
-	dir, err := collectionsDir()
+func LoadCollections() ([]*Collection, error) {
+	dir, err := CollectionsDir()
 	if err != nil {
 		return nil, err
 	}
@@ -102,7 +136,7 @@ func loadCollections() ([]*collection, error) {
 	if err != nil {
 		return nil, err
 	}
-	var result []*collection
+	var result []*Collection
 	for _, entry := range entries {
 		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".json") {
 			continue
@@ -111,7 +145,7 @@ func loadCollections() ([]*collection, error) {
 		if err != nil {
 			continue
 		}
-		var c collection
+		var c Collection
 		if err := json.Unmarshal(data, &c); err != nil {
 			continue
 		}
@@ -120,8 +154,8 @@ func loadCollections() ([]*collection, error) {
 	return result, nil
 }
 
-func saveCollection(c *collection) error {
-	dir, err := collectionsDir()
+func SaveCollection(c *Collection) error {
+	dir, err := CollectionsDir()
 	if err != nil {
 		return err
 	}
@@ -129,15 +163,15 @@ func saveCollection(c *collection) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(collectionFilePath(dir, c.Name), data, 0o644)
+	return os.WriteFile(CollectionFilePath(dir, c.Name), data, 0o644)
 }
 
-func renameCollection(c *collection, name string) error {
+func RenameCollection(c *Collection, name string) error {
 	if name == c.Name {
 		return nil
 	}
 
-	dir, err := collectionsDir()
+	dir, err := CollectionsDir()
 	if err != nil {
 		return err
 	}
@@ -149,8 +183,8 @@ func renameCollection(c *collection, name string) error {
 		return err
 	}
 
-	oldPath := collectionFilePath(dir, c.Name)
-	newPath := collectionFilePath(dir, name)
+	oldPath := CollectionFilePath(dir, c.Name)
+	newPath := CollectionFilePath(dir, name)
 	if err := os.WriteFile(newPath, data, 0o644); err != nil {
 		return err
 	}
@@ -165,15 +199,15 @@ func renameCollection(c *collection, name string) error {
 	return nil
 }
 
-func deleteCollection(name string) error {
-	dir, err := collectionsDir()
+func DeleteCollection(name string) error {
+	dir, err := CollectionsDir()
 	if err != nil {
 		return err
 	}
-	return os.Remove(collectionFilePath(dir, name))
+	return os.Remove(CollectionFilePath(dir, name))
 }
 
-func upsertRequest(collections []*collection, colName, oldName string, rd requestData) error {
+func UpsertRequest(collections []*Collection, colName, oldName string, rd RequestData) error {
 	for _, c := range collections {
 		if c.Name != colName {
 			continue
@@ -181,24 +215,24 @@ func upsertRequest(collections []*collection, colName, oldName string, rd reques
 		if oldName != "" {
 			for i := range c.Requests {
 				if c.Requests[i].Name == oldName {
-					if rd.Name != oldName && requestNameExists(c, rd.Name, i) {
+					if rd.Name != oldName && RequestNameExists(c, rd.Name, i) {
 						return fmt.Errorf("já existe uma requisição com o nome %q", rd.Name)
 					}
 					c.Requests[i] = rd
-					return saveCollection(c)
+					return SaveCollection(c)
 				}
 			}
 		}
-		if requestNameExists(c, rd.Name, -1) {
+		if RequestNameExists(c, rd.Name, -1) {
 			return fmt.Errorf("já existe uma requisição com o nome %q", rd.Name)
 		}
 		c.Requests = append(c.Requests, rd)
-		return saveCollection(c)
+		return SaveCollection(c)
 	}
 	return fmt.Errorf("coleção não encontrada: %s", colName)
 }
 
-func requestNameExists(c *collection, name string, except int) bool {
+func RequestNameExists(c *Collection, name string, except int) bool {
 	for i, r := range c.Requests {
 		if i != except && r.Name == name {
 			return true
@@ -207,10 +241,10 @@ func requestNameExists(c *collection, name string, except int) bool {
 	return false
 }
 
-func uniqueRequestName(c *collection, base string) string {
+func UniqueRequestName(c *Collection, base string) string {
 	name := base
 	for i := 2; ; i++ {
-		if !requestNameExists(c, name, -1) {
+		if !RequestNameExists(c, name, -1) {
 			return name
 		}
 		name = fmt.Sprintf("%s %d", base, i)
