@@ -24,7 +24,7 @@
           <key>COMMAND_STRING</key>
           <string>#!/bin/zsh
 set -eu
-highway="/Applications/Highway.app/Contents/MacOS/highway"
+highway="__HIGHWAY_BIN__"
 if [[ ! -x "$highway" ]]; then
   osascript -e 'display alert "Highway não encontrado" message "Instale Highway.app em /Applications antes de usar este serviço."'
   exit 1

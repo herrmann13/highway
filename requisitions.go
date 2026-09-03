@@ -149,6 +149,8 @@ func main() {
 }
 
 func runHighway(pendingImport string) {
+	ensureMacOSService()
+
 	a := app.NewWithID("com.herrmann.highway")
 	a.SetIcon(fyne.NewStaticResource("highway.png", highwayIconPNG))
 	a.Settings().SetTheme(theme.DarkTheme())

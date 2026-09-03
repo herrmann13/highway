@@ -55,7 +55,7 @@ make macos-dmg VERSION=0.1.0
 
 O arquivo será criado em `dist/Highway-0.1.0-macos-<arquitetura>.dmg`. Abra o DMG, arraste o Highway para `Applications` e autorize a primeira abertura pelo menu contextual, se o macOS solicitar.
 
-Para habilitar "Abrir no Highway" no menu de contexto do Finder/apps:
+Ao abrir o Highway instalado em `/Applications` pela primeira vez, o serviço "Abrir no Highway" é instalado automaticamente para o usuário atual. Se for necessário reinstalá-lo manualmente:
 
 ```bash
 make macos-service
