@@ -45,4 +45,29 @@ func TestCurlHistoryLabel(t *testing.T) {
 	if entries[0].Label != "POST https://api.example.com/users" {
 		t.Fatalf("label = %q", entries[0].Label)
 	}
+	if entries[0].Tooltip != "curl https://api.example.com/users POST" {
+		t.Fatalf("tooltip = %q", entries[0].Tooltip)
+	}
+}
+
+func TestCurlHistorySummaryIgnoresTrailingOptions(t *testing.T) {
+	history := NewCurlHistory(1)
+	history.Add("curl --request POST https://api.example.com/users --header 'Accept: application/json' --data '{\"name\":\"Ada\"}'")
+
+	entry := history.Entries()[0]
+	if entry.Label != "POST https://api.example.com/users" {
+		t.Fatalf("label = %q", entry.Label)
+	}
+	if entry.Tooltip != "curl https://api.example.com/users POST" {
+		t.Fatalf("tooltip = %q", entry.Tooltip)
+	}
+}
+
+func TestCurlHistorySummaryInfersPost(t *testing.T) {
+	history := NewCurlHistory(1)
+	history.Add("curl https://api.example.com/users --unsupported-option value --data-raw name=ada")
+
+	if got := history.Entries()[0].Tooltip; got != "curl https://api.example.com/users POST" {
+		t.Fatalf("tooltip = %q", got)
+	}
 }

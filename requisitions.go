@@ -702,13 +702,16 @@ func runHighway(pendingImport string) {
 
 	var monitorCurl atomic.Bool
 	monitorCurl.Store(a.Preferences().BoolWithFallback("detect-curl", false))
+	var refreshCurlHistory func()
 	monitorCheck := widget.NewCheck("Detectar cURLs", func(enabled bool) {
 		monitorCurl.Store(enabled)
 		a.Preferences().SetBool("detect-curl", enabled)
+		if refreshCurlHistory != nil {
+			refreshCurlHistory()
+		}
 	})
 	monitorCheck.SetChecked(monitorCurl.Load())
 
-	var refreshCurlHistory func()
 	go func() {
 		ticker := time.NewTicker(time.Second)
 		defer ticker.Stop()
@@ -742,13 +745,13 @@ func runHighway(pendingImport string) {
 	historyList := widget.NewList(
 		func() int { return len(curlHistory.Entries()) },
 		func() fyne.CanvasObject {
-			label := widget.NewLabel("")
-			label.TextStyle = fyne.TextStyle{Monospace: true}
-			label.Truncation = fyne.TextTruncateEllipsis
-			return label
+			return newCurlHistoryLabel()
 		},
 		func(id widget.ListItemID, item fyne.CanvasObject) {
-			item.(*widget.Label).SetText(curlHistory.Entries()[id].Label)
+			label := item.(*curlHistoryLabel)
+			entry := curlHistory.Entries()[id]
+			label.SetText(entry.Label)
+			label.SetTooltip(entry.Tooltip)
 		},
 	)
 	historyList.OnSelected = func(id widget.ListItemID) {
@@ -756,16 +759,27 @@ func runHighway(pendingImport string) {
 		if id < 0 || id >= len(entries) {
 			return
 		}
-		showCurlImportDialog(entries[id].Command)
+		command := entries[id].Command
+		historyList.Unselect(id)
+		showCurlImportDialog(command)
 	}
-	historyEmpty := widget.NewLabel("Ative Detectar cURLs para registrar cópias nesta sessão.")
+	historyEmpty := widget.NewLabel("")
+	historyEmpty.Wrapping = fyne.TextWrapWord
 	historyContent := container.NewStack(historyEmpty, historyList)
 	historyPanel := container.NewGridWrap(
 		fyne.NewSize(240, 180),
-		container.NewBorder(widget.NewLabel("Área de transferência"), nil, nil, nil, historyContent),
+		container.NewBorder(
+			container.NewVBox(widget.NewSeparator(), widget.NewLabel("Área de transferência")),
+			nil, nil, nil, historyContent,
+		),
 	)
 	refreshCurlHistory = func() {
 		if len(curlHistory.Entries()) == 0 {
+			if monitorCurl.Load() {
+				historyEmpty.SetText("Nenhum cURL copiado nesta sessão.")
+			} else {
+				historyEmpty.SetText("Ative Detectar cURLs para registrar cópias.")
+			}
 			historyList.Hide()
 			historyEmpty.Show()
 			return
