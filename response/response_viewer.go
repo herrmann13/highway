@@ -16,6 +16,45 @@ type ResponseViewer struct {
 	lines    []string
 }
 
+type ResponseHeadersViewer struct {
+	Content fyne.CanvasObject
+	List    *widget.List
+	lines   []string
+}
+
+func NewResponseHeadersViewer() *ResponseHeadersViewer {
+	viewer := &ResponseHeadersViewer{}
+	viewer.List = widget.NewList(
+		func() int { return len(viewer.lines) },
+		func() fyne.CanvasObject {
+			label := widget.NewLabel("")
+			label.TextStyle = fyne.TextStyle{Monospace: true}
+			label.Truncation = fyne.TextTruncateClip
+			return label
+		},
+		func(id widget.ListItemID, item fyne.CanvasObject) {
+			item.(*widget.Label).SetText(viewer.lines[id])
+		},
+	)
+	viewer.Content = viewer.List
+	return viewer
+}
+
+func (v *ResponseHeadersViewer) SetHeaders(headers string) {
+	headers = strings.TrimSuffix(headers, "\n")
+	if headers == "" {
+		v.lines = nil
+	} else {
+		v.lines = strings.Split(headers, "\n")
+	}
+	v.List.Refresh()
+	v.List.ScrollToTop()
+}
+
+func (v *ResponseHeadersViewer) Clear() {
+	v.SetHeaders("")
+}
+
 func NewResponseViewer() *ResponseViewer {
 	viewer := &ResponseViewer{}
 	viewer.List = widget.NewList(

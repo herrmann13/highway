@@ -153,13 +153,14 @@ func runHighway(pendingImport string) {
 
 	a := app.NewWithID("com.herrmann.highway")
 	a.SetIcon(fyne.NewStaticResource("highway.png", highwayIconPNG))
-	a.Settings().SetTheme(theme.DarkTheme())
+	a.Settings().SetTheme(newHighwayTheme())
 	w := a.NewWindow("Highway")
 
 	collections, err := storage.LoadCollections()
 	if err != nil {
 		collections = []*storage.Collection{}
 	}
+	curlHistory := clipboard.NewCurlHistory(clipboard.DefaultCurlHistoryLimit)
 
 	tabs := container.NewDocTabs()
 	tabIndex := map[*container.TabItem]*requestTab{}
@@ -707,7 +708,7 @@ func runHighway(pendingImport string) {
 	})
 	monitorCheck.SetChecked(monitorCurl.Load())
 
-	var curlPromptOpen atomic.Bool
+	var refreshCurlHistory func()
 	go func() {
 		ticker := time.NewTicker(time.Second)
 		defer ticker.Stop()
@@ -717,20 +718,17 @@ func runHighway(pendingImport string) {
 				continue
 			}
 			command, detected := detector.Detect(w.Clipboard().Content())
-			if !detected || !curlPromptOpen.CompareAndSwap(false, true) {
+			if !detected {
 				continue
 			}
 			fyne.Do(func() {
 				if !monitorCurl.Load() {
-					curlPromptOpen.Store(false)
 					return
 				}
-				dialog.ShowConfirm("cURL detectado", "Abrir esta requisição no Highway?", func(open bool) {
-					curlPromptOpen.Store(false)
-					if open {
-						showCurlImportDialog(command)
-					}
-				}, w)
+				curlHistory.Add(command)
+				if refreshCurlHistory != nil {
+					refreshCurlHistory()
+				}
 			})
 		}
 	}()
@@ -741,7 +739,44 @@ func runHighway(pendingImport string) {
 		monitorCheck,
 		container.NewHBox(newCollectionButton),
 	)
-	sidebar := container.NewBorder(actionBar, nil, nil, nil, container.NewScroll(tree))
+	historyList := widget.NewList(
+		func() int { return len(curlHistory.Entries()) },
+		func() fyne.CanvasObject {
+			label := widget.NewLabel("")
+			label.TextStyle = fyne.TextStyle{Monospace: true}
+			label.Truncation = fyne.TextTruncateEllipsis
+			return label
+		},
+		func(id widget.ListItemID, item fyne.CanvasObject) {
+			item.(*widget.Label).SetText(curlHistory.Entries()[id].Label)
+		},
+	)
+	historyList.OnSelected = func(id widget.ListItemID) {
+		entries := curlHistory.Entries()
+		if id < 0 || id >= len(entries) {
+			return
+		}
+		showCurlImportDialog(entries[id].Command)
+	}
+	historyEmpty := widget.NewLabel("Ative Detectar cURLs para registrar cópias nesta sessão.")
+	historyContent := container.NewStack(historyEmpty, historyList)
+	historyPanel := container.NewGridWrap(
+		fyne.NewSize(240, 180),
+		container.NewBorder(widget.NewLabel("Área de transferência"), nil, nil, nil, historyContent),
+	)
+	refreshCurlHistory = func() {
+		if len(curlHistory.Entries()) == 0 {
+			historyList.Hide()
+			historyEmpty.Show()
+			return
+		}
+		historyEmpty.Hide()
+		historyList.Show()
+		historyList.Refresh()
+	}
+	refreshCurlHistory()
+
+	sidebar := container.NewBorder(actionBar, historyPanel, nil, nil, container.NewScroll(tree))
 
 	split := container.NewHSplit(sidebar, tabs)
 	split.SetOffset(0.22)
@@ -854,12 +889,12 @@ func sectionPanel(title string, accent, bg color.Color, content fyne.CanvasObjec
 	)
 }
 
-func showError(statusText *canvas.Text, responseBody *response.ResponseViewer, responseHeaders *widget.Entry, err error) {
+func showError(statusText *canvas.Text, responseBody *response.ResponseViewer, responseHeaders *response.ResponseHeadersViewer, err error) {
 	statusText.Text = "Erro: " + err.Error()
 	statusText.Color = errorColor()
 	statusText.Refresh()
 	responseBody.Clear()
-	responseHeaders.SetText("")
+	responseHeaders.Clear()
 }
 
 func statusColor(code int) color.Color {

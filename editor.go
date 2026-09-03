@@ -398,7 +398,7 @@ type requestTab struct {
 	nameLabel      *renameLabel
 	editor         *requestEditor
 	status         *canvas.Text
-	respHeaders    *widget.Entry
+	respHeaders    *response.ResponseHeadersViewer
 	responseViewer *response.ResponseViewer
 	content        *fyne.Container
 	sync           func(*requestTab)
@@ -453,9 +453,7 @@ func newRequestTab(w fyne.Window, rd *storage.RequestData, collectionName string
 	rt.status = status
 
 	responseViewer := response.NewResponseViewer()
-	respHeaders := widget.NewMultiLineEntry()
-	respHeaders.SetPlaceHolder("Headers da resposta")
-	respHeaders.Disable()
+	respHeaders := response.NewResponseHeadersViewer()
 	rt.respHeaders = respHeaders
 	rt.responseViewer = responseViewer
 
@@ -466,7 +464,7 @@ func newRequestTab(w fyne.Window, rd *storage.RequestData, collectionName string
 
 	responseTabs := container.NewAppTabs(
 		container.NewTabItem("Body", responseViewer.List),
-		container.NewTabItem("Headers", respHeaders),
+		container.NewTabItem("Headers", respHeaders.Content),
 	)
 
 	sendButton := widget.NewButton("Enviar", func() {
@@ -513,7 +511,7 @@ func newRequestTab(w fyne.Window, rd *storage.RequestData, collectionName string
 				status.Color = statusColor(result.statusCode)
 				status.Refresh()
 				responseViewer.SetResponse(result.body, bodyLines)
-				respHeaders.SetText(formatHeaders(result.headers))
+				respHeaders.SetHeaders(formatHeaders(result.headers))
 			})
 		}()
 	})
