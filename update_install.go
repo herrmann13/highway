@@ -39,9 +39,9 @@ func installLinuxUpdate(path string) (string, error) {
 	return "Atualização instalada. Feche e abra o Highway novamente para usar a nova versão.", nil
 }
 
-func installMacUpdate(zipPath string) (string, error) {
-	if filepath.Ext(zipPath) != ".zip" {
-		return "", fmt.Errorf("o instalador macOS deve ser um arquivo .zip")
+func installMacUpdate(dmgPath string) (string, error) {
+	if filepath.Ext(dmgPath) != ".dmg" {
+		return "", fmt.Errorf("o instalador macOS deve ser um arquivo .dmg")
 	}
 	appPath, err := currentMacAppPath()
 	if err != nil {
@@ -55,9 +55,12 @@ func installMacUpdate(zipPath string) (string, error) {
 	if _, err := script.WriteString(`#!/bin/sh
 while kill -0 "$1" 2>/dev/null; do sleep 1; done
 tmp_dir=$(mktemp -d)
-/usr/bin/ditto -x -k "$2" "$tmp_dir"
+mount_dir="$tmp_dir/mount"
+mkdir "$mount_dir"
+/usr/bin/hdiutil attach -readonly -nobrowse -mountpoint "$mount_dir" "$2"
 rm -rf "$3"
-mv "$tmp_dir/Highway.app" "$3"
+cp -R "$mount_dir/Highway.app" "$3"
+/usr/bin/hdiutil detach "$mount_dir"
 console_user=$(/usr/bin/stat -f %Su /dev/console)
 if [ -n "$console_user" ] && [ "$console_user" != "root" ]; then
   /usr/bin/sudo -u "$console_user" /usr/bin/open "$3"
@@ -77,7 +80,7 @@ rm -rf "$tmp_dir" "$2" "$0"
 		return "", err
 	}
 
-	command := "/bin/sh " + shellQuote(scriptPath) + " " + strconv.Itoa(os.Getpid()) + " " + shellQuote(zipPath) + " " + shellQuote(appPath) + " >/dev/null 2>&1 &"
+	command := "/bin/sh " + shellQuote(scriptPath) + " " + strconv.Itoa(os.Getpid()) + " " + shellQuote(dmgPath) + " " + shellQuote(appPath) + " >/dev/null 2>&1 &"
 	if err := exec.Command("/usr/bin/osascript", "-e", "do shell script "+strconv.Quote(command)+" with administrator privileges").Run(); err != nil {
 		_ = os.Remove(scriptPath)
 		return "", fmt.Errorf("não foi possível iniciar o atualizador: %w", err)

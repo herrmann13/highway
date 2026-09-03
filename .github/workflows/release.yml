@@ -31,8 +31,10 @@ jobs:
         include:
           - runner: macos-15-intel
             arch: amd64
+            binary_arch: x86_64
           - runner: macos-14
             arch: arm64
+            binary_arch: arm64
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v5
@@ -41,14 +43,21 @@ jobs:
           go-version-file: go.mod
       - name: Set application version
         run: perl -0pi -e 's/^Version = ".*"/Version = "${{ github.ref_name }}"/m; s/Version = "v/Version = "/' FyneApp.toml
-      - name: Build macOS application
-        run: make macos VERSION="${GITHUB_REF_NAME#v}"
-      - name: Archive application
-        run: ditto -c -k --sequesterRsrc --keepParent dist/Highway.app "Highway-${GITHUB_REF_NAME#v}-macos-${{ matrix.arch }}.zip"
+      - name: Build macOS DMG
+        run: make macos-dmg VERSION="${GITHUB_REF_NAME#v}" ARCH="${{ matrix.arch }}"
+      - name: Validate macOS DMG
+        run: |
+          test "$(lipo -archs dist/Highway.app/Contents/MacOS/highway)" = "${{ matrix.binary_arch }}"
+          mount_dir=$(mktemp -d)
+          hdiutil attach -readonly -nobrowse -mountpoint "$mount_dir" "dist/Highway-${GITHUB_REF_NAME#v}-macos-${{ matrix.arch }}.dmg"
+          test -d "$mount_dir/Highway.app"
+          test -L "$mount_dir/Applications"
+          hdiutil detach "$mount_dir"
+          rmdir "$mount_dir"
       - uses: actions/upload-artifact@v4
         with:
           name: macos-${{ matrix.arch }}
-          path: Highway-*.zip
+          path: dist/Highway-*-macos-*.dmg
 
   publish:
     needs: [linux, macos]
@@ -63,4 +72,4 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-        run: cd release && sha256sum highway_*_amd64.deb Highway-*-macos-*.zip > SHA256SUMS && gh release create "$GITHUB_REF_NAME" --generate-notes highway_*_amd64.deb Highway-*-macos-*.zip SHA256SUMS
+        run: cd release && sha256sum highway_*_amd64.deb Highway-*-macos-*.dmg > SHA256SUMS && gh release create "$GITHUB_REF_NAME" --generate-notes highway_*_amd64.deb Highway-*-macos-*.dmg SHA256SUMS

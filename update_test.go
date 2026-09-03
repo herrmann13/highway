@@ -24,7 +24,7 @@ func TestParseSemanticVersionAndComparison(t *testing.T) {
 func TestReleaseAssetForPlatform(t *testing.T) {
 	release := githubRelease{Assets: []releaseAsset{
 		{Name: "highway_0.2.0-1_amd64.deb"},
-		{Name: "Highway-0.2.0-macos-arm64.zip"},
+		{Name: "Highway-0.2.0-macos-arm64.dmg"},
 		{Name: "SHA256SUMS"},
 	}}
 	asset, err := releaseAssetForPlatform(release, "linux", "amd64")
@@ -32,7 +32,7 @@ func TestReleaseAssetForPlatform(t *testing.T) {
 		t.Fatalf("asset Linux incorreto: %#v, %v", asset, err)
 	}
 	asset, err = releaseAssetForPlatform(release, "darwin", "arm64")
-	if err != nil || asset.Name != "Highway-0.2.0-macos-arm64.zip" {
+	if err != nil || asset.Name != "Highway-0.2.0-macos-arm64.dmg" {
 		t.Fatalf("asset macOS incorreto: %#v, %v", asset, err)
 	}
 	if _, err := releaseAssetForPlatform(release, "darwin", "amd64"); err == nil {

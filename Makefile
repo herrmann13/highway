@@ -2,24 +2,36 @@ APP := Highway
 APP_ID := com.herrmann.highway
 PACKAGE := highway
 VERSION ?= 0.1.0
+ARCH ?= $(shell go env GOARCH)
 DEB_REVISION ?= 1
 DEB_VERSION := $(VERSION)-$(DEB_REVISION)
 DIST := dist
 ICON_SVG := assets/highway.svg
-ICON_PNG := assets/highway.png
+ICON_PNG := $(DIST)/highway.png
 FYNE := go run fyne.io/tools/cmd/fyne@latest
 LDFLAGS := -X main.appVersion=$(VERSION)
 DEB_ROOT := $(DIST)/deb/$(PACKAGE)_$(DEB_VERSION)_amd64
+DMG_STAGE := $(DIST)/dmg
+DMG := $(DIST)/$(APP)-$(VERSION)-macos-$(ARCH).dmg
 
-.PHONY: macos macos-service linux deb icon clean test
+.PHONY: macos macos-dmg macos-service linux deb icon clean test
 
 macos: icon
 	mkdir -p $(DIST)
 	rm -rf $(DIST)/$(APP).app $(APP).app
-	go build -ldflags "$(LDFLAGS)" -o $(APP) .
-	$(FYNE) package -os darwin -name $(APP) -appID $(APP_ID) -icon $(ICON_PNG)
-	rm -f $(APP)
+	go build -ldflags "$(LDFLAGS)" -o $(DIST)/$(APP) .
+	$(FYNE) package -os darwin -name $(APP) -appID $(APP_ID) -icon $(ICON_PNG) --executable $(DIST)/$(APP)
+	rm -f $(DIST)/$(APP)
 	mv $(APP).app $(DIST)/$(APP).app
+
+macos-dmg: macos
+	rm -rf $(DMG_STAGE) $(DMG)
+	mkdir -p $(DMG_STAGE)
+	cp -R $(DIST)/$(APP).app $(DMG_STAGE)/$(APP).app
+	ln -s /Applications $(DMG_STAGE)/Applications
+	hdiutil create -volname $(APP) -srcfolder $(DMG_STAGE) -ov -format UDZO $(DMG)
+	hdiutil verify $(DMG)
+	rm -rf $(DMG_STAGE)
 
 macos-service:
 	zsh packaging/macos/install-service.sh
@@ -51,6 +63,7 @@ deb: icon
 	dpkg-deb --build --root-owner-group $(DEB_ROOT) $(DIST)/$(PACKAGE)_$(DEB_VERSION)_amd64.deb
 
 icon:
+	mkdir -p $(DIST)
 	@if command -v sips >/dev/null 2>&1; then \
 		sips -s format png $(ICON_SVG) --out $(ICON_PNG) >/dev/null; \
 	elif command -v rsvg-convert >/dev/null 2>&1; then \

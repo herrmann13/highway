@@ -47,6 +47,14 @@ make macos
 
 O app será criado em `dist/Highway.app`. Arraste-o para `Aplicativos` ou abra-o diretamente. Como o build não é assinado, o macOS pode exigir clicar com o botão direito e escolher `Abrir` na primeira execução.
 
+Para gerar um DMG para distribuição, com o app e um atalho para `Aplicativos`:
+
+```bash
+make macos-dmg VERSION=0.1.0
+```
+
+O arquivo será criado em `dist/Highway-0.1.0-macos-<arquitetura>.dmg`. Abra o DMG, arraste o Highway para `Applications` e autorize a primeira abertura pelo menu contextual, se o macOS solicitar.
+
 Para habilitar "Abrir no Highway" no menu de contexto do Finder/apps:
 
 ```bash
@@ -84,7 +92,7 @@ Garanta que `~/.local/bin` esteja no `PATH` e abra o Highway pelo menu de aplica
 
 ## Releases
 
-Publicar uma tag no formato `vMAJOR.MINOR.PATCH` aciona o workflow de release do GitHub. Ele gera os pacotes macOS para Intel e Apple Silicon, o `.deb` para Linux x86_64 e o arquivo `SHA256SUMS` usado pelo atualizador.
+Publicar uma tag no formato `vMAJOR.MINOR.PATCH` aciona o workflow de release do GitHub. Ele gera DMGs macOS para Intel e Apple Silicon, o `.deb` para Linux x86_64 e o arquivo `SHA256SUMS` usado pelo atualizador.
 
 ```bash
 git tag v0.2.0

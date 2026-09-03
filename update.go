@@ -108,7 +108,7 @@ func releaseAssetForPlatform(release githubRelease, goos, goarch string) (releas
 	case "linux":
 		suffix = "_" + goarch + ".deb"
 	case "darwin":
-		suffix = "-macos-" + goarch + ".zip"
+		suffix = "-macos-" + goarch + ".dmg"
 	default:
 		return releaseAsset{}, fmt.Errorf("atualização não suportada em %s", goos)
 	}
