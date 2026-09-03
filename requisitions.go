@@ -479,22 +479,31 @@ func runHighway(pendingImport string) {
 		func(uid string) bool { return uid == "" || strings.HasPrefix(uid, "col:") },
 		func(branch bool) fyne.CanvasObject {
 			if branch {
-				return container.NewHBox(
+				menuButton := widget.NewButton("⋯", nil)
+				menuButton.Importance = widget.LowImportance
+				row := container.NewHBox(
 					newRenameLabel(),
 					layout.NewSpacer(),
-					widget.NewButton("⋯", nil),
+					menuButton,
 				)
+				return container.NewStack(canvas.NewRectangle(collectionHeaderColor()), row)
 			}
+			deleteButton := widget.NewButtonWithIcon("", theme.CancelIcon(), nil)
+			deleteButton.Importance = widget.LowImportance
 			return container.NewHBox(
 				widget.NewIcon(requestTypeIcon(requestTypeHTTP)),
 				newRenameLabel(),
 				layout.NewSpacer(),
-				widget.NewButtonWithIcon("", theme.CancelIcon(), nil),
+				deleteButton,
 			)
 		},
 		func(uid string, branch bool, node fyne.CanvasObject) {
 			if branch {
-				box, ok := node.(*fyne.Container)
+				stack, ok := node.(*fyne.Container)
+				if !ok || len(stack.Objects) < 2 {
+					return
+				}
+				box, ok := stack.Objects[1].(*fyne.Container)
 				if !ok || len(box.Objects) < 3 {
 					return
 				}
@@ -561,7 +570,7 @@ func runHighway(pendingImport string) {
 		delete(tabIndex, item)
 	}
 
-	newCollectionButton := widget.NewButton("Nova Coleção", func() {
+	newCollectionButton := widget.NewButtonWithIcon("Nova Coleção", theme.ContentAddIcon(), func() {
 		nameEntry := widget.NewEntry()
 		nameEntry.SetPlaceHolder("Ex.: API de usuários")
 		nameEntry.Validator = func(name string) error {
@@ -599,6 +608,7 @@ func runHighway(pendingImport string) {
 		d.Resize(fyne.NewSize(520, 180))
 		d.Show()
 	})
+	newCollectionButton.Importance = widget.LowImportance
 
 	var showCurlImportDialog func(string)
 	showCurlImportDialog = func(command string) {
@@ -667,13 +677,13 @@ func runHighway(pendingImport string) {
 		d.Show()
 	}
 
-	var importButton *widget.Button
-	importButton = widget.NewButton("Importação", func() {
-		c := fyne.CurrentApp().Driver().CanvasForObject(importButton)
+	var optionsButton *widget.Button
+	optionsButton = widget.NewButton("Opções", func() {
+		c := fyne.CurrentApp().Driver().CanvasForObject(optionsButton)
 		if c == nil {
 			return
 		}
-		item := fyne.NewMenuItem("cURL", func() { showCurlImportDialog("") })
+		curlItem := fyne.NewMenuItem("cURL", func() { showCurlImportDialog("") })
 		collectionsItem := fyne.NewMenuItem("Coleções", func() {
 			showImportCollectionsDialog(w, collections, func(imported []*collection) {
 				if err := saveImportedCollections(imported); err != nil {
@@ -685,12 +695,17 @@ func runHighway(pendingImport string) {
 				dialog.ShowInformation("Importar coleções", fmt.Sprintf("%d coleção(ões) importada(s).", len(imported)), w)
 			})
 		})
-		pop := widget.NewPopUpMenu(fyne.NewMenu("", item, collectionsItem), c)
-		pos := fyne.CurrentApp().Driver().AbsolutePositionForObject(importButton)
-		pop.ShowAtPosition(pos.Add(fyne.NewPos(0, importButton.Size().Height)))
-	})
-	exportButton := widget.NewButton("Exportar", func() {
-		showExportCollectionsDialog(w, collections)
+		importItem := fyne.NewMenuItem("Importação", nil)
+		importItem.ChildMenu = fyne.NewMenu("", curlItem, collectionsItem)
+		exportItem := fyne.NewMenuItem("Exportar", func() {
+			showExportCollectionsDialog(w, collections)
+		})
+		updateItem := fyne.NewMenuItem("Verificar atualizações", func() {
+			checkForUpdates(a, w, optionsButton)
+		})
+		pop := widget.NewPopUpMenu(fyne.NewMenu("", importItem, exportItem, updateItem), c)
+		pos := fyne.CurrentApp().Driver().AbsolutePositionForObject(optionsButton)
+		pop.ShowAtPosition(pos.Add(fyne.NewPos(0, optionsButton.Size().Height)))
 	})
 
 	var monitorCurl atomic.Bool
@@ -729,13 +744,11 @@ func runHighway(pendingImport string) {
 		}
 	}()
 
-	updateButton := widget.NewButton("Verificar atualizações", nil)
-	updateButton.OnTapped = func() { checkForUpdates(a, w, updateButton) }
 	versionLabel := widget.NewLabel("v" + appVersion)
 	actionBar := container.NewVBox(
-		container.NewHBox(newCollectionButton, importButton, exportButton),
-		container.NewHBox(updateButton, versionLabel),
+		container.NewHBox(optionsButton, versionLabel),
 		monitorCheck,
+		container.NewHBox(newCollectionButton),
 	)
 	sidebar := container.NewBorder(actionBar, nil, nil, nil, container.NewScroll(tree))
 
@@ -820,6 +833,18 @@ func requestForUID(collections []*collection, uid string) (*collection, *request
 
 func requestTabMatches(rt *requestTab, collectionName, requestName string) bool {
 	return rt != nil && rt.collectionName == collectionName && rt.name == requestName
+}
+
+func collectionHeaderColor() color.Color {
+	background := color.NRGBAModel.Convert(theme.BackgroundColor()).(color.NRGBA)
+	primary := color.NRGBAModel.Convert(theme.PrimaryColor()).(color.NRGBA)
+	const primaryWeight = 12
+	return color.NRGBA{
+		R: uint8((int(background.R)*(100-primaryWeight) + int(primary.R)*primaryWeight) / 100),
+		G: uint8((int(background.G)*(100-primaryWeight) + int(primary.G)*primaryWeight) / 100),
+		B: uint8((int(background.B)*(100-primaryWeight) + int(primary.B)*primaryWeight) / 100),
+		A: background.A,
+	}
 }
 
 func sectionPanel(title string, accent, bg color.Color, content fyne.CanvasObject) *fyne.Container {

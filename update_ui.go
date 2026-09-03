@@ -14,7 +14,6 @@ import (
 
 func checkForUpdates(a fyne.App, w fyne.Window, button *widget.Button) {
 	button.Disable()
-	button.SetText("Verificando atualizações...")
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), updateTimeout)
 		defer cancel()
@@ -23,7 +22,6 @@ func checkForUpdates(a fyne.App, w fyne.Window, button *widget.Button) {
 		latest, latestErr := parseSemanticVersion(release.TagName)
 		fyne.Do(func() {
 			button.Enable()
-			button.SetText("Verificar atualizações")
 			if err != nil {
 				dialog.ShowError(err, w)
 				return
@@ -56,7 +54,6 @@ func checkForUpdates(a fyne.App, w fyne.Window, button *widget.Button) {
 
 func downloadAndInstallUpdate(a fyne.App, w fyne.Window, button *widget.Button, release githubRelease, asset releaseAsset) {
 	button.Disable()
-	button.SetText("Baixando atualização...")
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*updateTimeout)
 		defer cancel()
@@ -72,7 +69,6 @@ func downloadAndInstallUpdate(a fyne.App, w fyne.Window, button *widget.Button, 
 		}
 		fyne.Do(func() {
 			button.Enable()
-			button.SetText("Verificar atualizações")
 			if err != nil {
 				dialog.ShowError(err, w)
 				return
