@@ -11,6 +11,7 @@ import (
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/widget"
 
+	"highway/i18n"
 	"highway/version"
 )
 
@@ -29,11 +30,11 @@ func CheckForUpdates(a fyne.App, w fyne.Window, button *widget.Button) {
 				return
 			}
 			if currentErr != nil || latestErr != nil {
-				dialog.ShowError(fmt.Errorf("não foi possível comparar as versões"), w)
+				dialog.ShowError(fmt.Errorf("%s", i18n.T("update.compare")), w)
 				return
 			}
 			if !latest.NewerThan(current) {
-				dialog.ShowInformation("Atualizações", "Você já está usando a versão mais recente (v"+version.AppVersion+").", w)
+				dialog.ShowInformation(i18n.T("update.title"), i18n.Tf("update.upToDate", version.AppVersion), w)
 				return
 			}
 			asset, err := ReleaseAssetForPlatform(release, runtime.GOOS, runtime.GOARCH)
@@ -41,11 +42,11 @@ func CheckForUpdates(a fyne.App, w fyne.Window, button *widget.Button) {
 				dialog.ShowError(err, w)
 				return
 			}
-			message := "A versão " + release.TagName + " está disponível.\n\nDeseja baixar e instalar agora?"
+			message := i18n.Tf("update.available", release.TagName)
 			if notes := strings.TrimSpace(release.Body); notes != "" {
-				message += "\n\nNotas da release:\n" + truncateUpdateNotes(notes)
+				message += "\n\n" + i18n.T("update.notes") + truncateUpdateNotes(notes)
 			}
-			dialog.ShowConfirm("Atualização disponível", message, func(ok bool) {
+			dialog.ShowConfirm(i18n.T("update.availableTitle"), message, func(ok bool) {
 				if ok {
 					DownloadAndInstallUpdate(a, w, button, release, asset)
 				}
@@ -79,7 +80,7 @@ func DownloadAndInstallUpdate(a fyne.App, w fyne.Window, button *widget.Button, 
 				a.Quit()
 				return
 			}
-			dialog.ShowInformation("Atualização instalada", "A atualização foi instalada. Feche e abra o Highway novamente para usar a nova versão.", w)
+			dialog.ShowInformation(i18n.T("update.installedTitle"), i18n.T("update.installed"), w)
 		})
 	}()
 }

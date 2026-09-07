@@ -8,6 +8,8 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+
+	"highway/i18n"
 )
 
 func InstallUpdate(path string) (string, error) {
@@ -17,31 +19,31 @@ func InstallUpdate(path string) (string, error) {
 	case "darwin":
 		return installMacUpdate(path)
 	default:
-		return "", fmt.Errorf("atualização não suportada em %s", runtime.GOOS)
+		return "", fmt.Errorf("%s", i18n.Tf("err.update.unsupported", runtime.GOOS))
 	}
 }
 
 func installLinuxUpdate(path string) (string, error) {
 	if filepath.Ext(path) != ".deb" {
-		return "", fmt.Errorf("o instalador Linux deve ser um arquivo .deb")
+		return "", fmt.Errorf("%s", i18n.T("err.update.installLinux"))
 	}
 	if _, err := exec.LookPath("pkexec"); err != nil {
-		return "", fmt.Errorf("pkexec não está disponível para autorizar a instalação")
+		return "", fmt.Errorf("%s", i18n.T("err.update.pkexec"))
 	}
 	aptPath, err := exec.LookPath("apt")
 	if err != nil {
-		return "", fmt.Errorf("apt não está disponível para instalar a atualização")
+		return "", fmt.Errorf("%s", i18n.T("err.update.apt"))
 	}
 	if output, err := exec.Command("pkexec", aptPath, "install", "-y", path).CombinedOutput(); err != nil {
-		return "", fmt.Errorf("não foi possível instalar a atualização: %w: %s", err, strings.TrimSpace(string(output)))
+		return "", fmt.Errorf("%s: %w: %s", i18n.T("err.update.installFailed"), err, strings.TrimSpace(string(output)))
 	}
 	_ = os.Remove(path)
-	return "Atualização instalada. Feche e abra o Highway novamente para usar a nova versão.", nil
+	return i18n.T("update.linuxInstalled"), nil
 }
 
 func installMacUpdate(dmgPath string) (string, error) {
 	if filepath.Ext(dmgPath) != ".dmg" {
-		return "", fmt.Errorf("o instalador macOS deve ser um arquivo .dmg")
+		return "", fmt.Errorf("%s", i18n.T("err.update.installMac"))
 	}
 	appPath, err := currentMacAppPath()
 	if err != nil {
@@ -83,9 +85,9 @@ rm -rf "$tmp_dir" "$2" "$0"
 	command := "/bin/sh " + shellQuote(scriptPath) + " " + strconv.Itoa(os.Getpid()) + " " + shellQuote(dmgPath) + " " + shellQuote(appPath) + " >/dev/null 2>&1 &"
 	if err := exec.Command("/usr/bin/osascript", "-e", "do shell script "+strconv.Quote(command)+" with administrator privileges").Run(); err != nil {
 		_ = os.Remove(scriptPath)
-		return "", fmt.Errorf("não foi possível iniciar o atualizador: %w", err)
+		return "", i18n.Errorf("err.update.launchUpdater", err)
 	}
-	return "A atualização será instalada após o Highway ser fechado.", nil
+	return i18n.T("update.macWillInstall"), nil
 }
 
 func currentMacAppPath() (string, error) {
@@ -96,7 +98,7 @@ func currentMacAppPath() (string, error) {
 	marker := ".app/Contents/MacOS/"
 	index := strings.Index(executable, marker)
 	if index < 0 {
-		return "", fmt.Errorf("instale o Highway em Aplicativos antes de usar a atualização automática")
+		return "", fmt.Errorf("%s", i18n.T("err.update.appPath"))
 	}
 	return executable[:index+len(".app")], nil
 }

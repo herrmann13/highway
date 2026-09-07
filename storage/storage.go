@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"highway/i18n"
 )
 
 type RequestData struct {
@@ -216,7 +218,7 @@ func UpsertRequest(collections []*Collection, colName, oldName string, rd Reques
 			for i := range c.Requests {
 				if c.Requests[i].Name == oldName {
 					if rd.Name != oldName && RequestNameExists(c, rd.Name, i) {
-						return fmt.Errorf("já existe uma requisição com o nome %q", rd.Name)
+						return fmt.Errorf("%s", i18n.Tf("err.requestNameExists", rd.Name))
 					}
 					c.Requests[i] = rd
 					return SaveCollection(c)
@@ -224,12 +226,12 @@ func UpsertRequest(collections []*Collection, colName, oldName string, rd Reques
 			}
 		}
 		if RequestNameExists(c, rd.Name, -1) {
-			return fmt.Errorf("já existe uma requisição com o nome %q", rd.Name)
+			return fmt.Errorf("%s", i18n.Tf("err.requestNameExists", rd.Name))
 		}
 		c.Requests = append(c.Requests, rd)
 		return SaveCollection(c)
 	}
-	return fmt.Errorf("coleção não encontrada: %s", colName)
+	return fmt.Errorf("%s", i18n.Tf("err.storage.collectionNotFound", colName))
 }
 
 func RequestNameExists(c *Collection, name string, except int) bool {

@@ -5,6 +5,7 @@ import (
 	"regexp"
 	"strings"
 
+	"highway/i18n"
 	"highway/storage"
 )
 
@@ -28,7 +29,7 @@ func ExpandRequestSnapshot(snapshot storage.RequestSnapshot, variables [][2]stri
 			return resolved
 		})
 		if missing != "" {
-			return "", fmt.Errorf("variável não encontrada: %s", missing)
+			return "", fmt.Errorf("%s", i18n.Tf("err.var.notFound", missing))
 		}
 		return result, nil
 	}
@@ -109,7 +110,7 @@ func VariableValues(variables [][2]string) (map[string]string, error) {
 			continue
 		}
 		if _, exists := values[name]; exists {
-			return nil, fmt.Errorf("a variável %q está definida mais de uma vez", name)
+			return nil, fmt.Errorf("%s", i18n.Tf("err.var.duplicate", name))
 		}
 		values[name] = variable[1]
 	}

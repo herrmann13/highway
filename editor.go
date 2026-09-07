@@ -13,6 +13,7 @@ import (
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 
+	"highway/i18n"
 	"highway/request"
 	"highway/response"
 	"highway/storage"
@@ -90,10 +91,10 @@ func newRequestEditor(rd *storage.RequestData, onEdit func(), onAddVariable func
 		}
 	}
 
-	headersSection, headerPairs := keyValueSection("Adicionar Header", "Content-Type", "application/json", defHeaders, onEdit, newEntry)
-	paramsSection, paramPairs := keyValueSection("Adicionar Param", "chave", "valor", defParams, onEdit, newEntry)
-	formSection, formPairs := keyValueSection("Adicionar Campo", "chave", "valor", defForm, onEdit, newEntry)
-	multipartSection, multipartPairs := keyValueSection("Adicionar Campo", "chave", "valor", defMultipart, onEdit, newEntry)
+	headersSection, headerPairs := keyValueSection(i18n.T("kv.addHeader"), "Content-Type", "application/json", defHeaders, onEdit, newEntry)
+	paramsSection, paramPairs := keyValueSection(i18n.T("kv.addParam"), i18n.T("ph.key"), i18n.T("ph.value"), defParams, onEdit, newEntry)
+	formSection, formPairs := keyValueSection(i18n.T("kv.addField"), i18n.T("ph.key"), i18n.T("ph.value"), defForm, onEdit, newEntry)
+	multipartSection, multipartPairs := keyValueSection(i18n.T("kv.addField"), i18n.T("ph.key"), i18n.T("ph.value"), defMultipart, onEdit, newEntry)
 
 	e.headers = headerPairs
 	e.params = paramPairs
@@ -112,20 +113,20 @@ func newRequestEditor(rd *storage.RequestData, onEdit func(), onAddVariable func
 	e.authorizationContent.SetPlaceHolder("Auth Content")
 
 	e.basicUserEntry = newEntry()
-	e.basicUserEntry.SetPlaceHolder("usuário")
+	e.basicUserEntry.SetPlaceHolder(i18n.T("ph.user"))
 	e.basicPassEntry = variable.NewVariableEntry(false, true, onAddVariable)
-	e.basicPassEntry.SetPlaceHolder("senha")
+	e.basicPassEntry.SetPlaceHolder(i18n.T("ph.password"))
 	e.basicForm = &widget.Form{
 		Items: []*widget.FormItem{
-			{Text: "Usuário", Widget: e.basicUserEntry},
-			{Text: "Senha", Widget: e.basicPassEntry},
+			{Text: i18n.T("auth.user"), Widget: e.basicUserEntry},
+			{Text: i18n.T("auth.password"), Widget: e.basicPassEntry},
 		},
 	}
 
 	e.apiKeyNameEntry = newEntry()
 	e.apiKeyNameEntry.SetPlaceHolder("X-API-Key")
 	e.apiKeyValueEntry = newEntry()
-	e.apiKeyValueEntry.SetPlaceHolder("valor")
+	e.apiKeyValueEntry.SetPlaceHolder(i18n.T("ph.value"))
 	e.apiKeyLocation = widget.NewSelect([]string{"header", "query"}, nil)
 	e.apiKeyForm = &widget.Form{
 		Items: []*widget.FormItem{
@@ -419,7 +420,7 @@ func (rt *requestTab) scheduleSync() {
 }
 
 func newRequestTab(w fyne.Window, rd *storage.RequestData, collectionName string, sync func(*requestTab), variables func(string) [][2]string, onRename func(*requestTab)) *requestTab {
-	name := "Nova Requisição"
+	name := i18n.T("request.newName")
 	if rd != nil && rd.Name != "" {
 		name = rd.Name
 	}
@@ -457,7 +458,7 @@ func newRequestTab(w fyne.Window, rd *storage.RequestData, collectionName string
 	rt.respHeaders = respHeaders
 	rt.responseViewer = responseViewer
 
-	copyButton := widget.NewButton("Copiar", func() {
+	copyButton := widget.NewButton(i18n.T("button.copy"), func() {
 		w.Clipboard().SetContent(responseViewer.FullBody)
 	})
 	statusRow := container.NewHBox(status, layout.NewSpacer(), copyButton)
@@ -467,7 +468,7 @@ func newRequestTab(w fyne.Window, rd *storage.RequestData, collectionName string
 		container.NewTabItem("Headers", respHeaders.Content),
 	)
 
-	sendButton := widget.NewButton("Enviar", func() {
+	sendButton := widget.NewButton(i18n.T("button.send"), func() {
 		s := rt.editor.snapshot()
 		var variables [][2]string
 		if rt.variables != nil {
@@ -480,7 +481,7 @@ func newRequestTab(w fyne.Window, rd *storage.RequestData, collectionName string
 			return
 		}
 		responseViewer.Clear()
-		status.Text = "Enviando..."
+		status.Text = i18n.T("status.sending")
 		status.Color = theme.ForegroundColor()
 		status.Refresh()
 
@@ -518,9 +519,9 @@ func newRequestTab(w fyne.Window, rd *storage.RequestData, collectionName string
 
 	urlRow := container.NewBorder(nil, nil, rt.editor.method, sendButton, rt.editor.urlEntry)
 
-	requestPanel := sectionPanel("Requisição", theme.PrimaryColor(), theme.InputBackgroundColor(), rt.editor.tabs)
+	requestPanel := sectionPanel(i18n.T("section.request"), theme.PrimaryColor(), theme.InputBackgroundColor(), rt.editor.tabs)
 	responsePanel := sectionPanel(
-		"Resposta",
+		i18n.T("section.response"),
 		color.RGBA{R: 0x81, G: 0xc7, B: 0x84, A: 0xff},
 		theme.BackgroundColor(),
 		container.NewBorder(statusRow, nil, nil, nil, responseTabs),

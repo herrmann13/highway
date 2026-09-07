@@ -2,7 +2,7 @@
 
 A fast, native API client for macOS and Linux. Organize, edit, and run your HTTP requests — locally, privately, no account required.
 
-![Highway](docs/screenshot.png)
+![Highway](assets/screenshot.png)
 
 ## Why Highway?
 
@@ -28,39 +28,14 @@ This installs the `highway` binary, an application-menu entry, and the app icon.
 
 ## Features
 
-### Organize your requests
-- **Collections** group related requests and are saved locally as JSON.
-- A **tree** on the left shows your collections and requests, with inline renaming (double-click) and quick deletion.
-- Each request opens in its own **tab**; reopening one you already have open focuses its existing tab instead of duplicating it.
-- Requests are **visually tagged by type** (HTTP, GraphQL, WebSocket, gRPC, SSE), each with its own icon.
-
-### Build requests
-- Separate tabs for **method & URL**, **Query Params**, **Headers**, **Body**, and **Authorization**.
-- Body formats: **raw**, **`x-www-form-urlencoded`**, and **`multipart/form-data`**.
-
-### Variables
-- Reference `{{variable_name}}` in any field — URL, headers, body, or auth — and define the values per collection. Variables are expanded automatically before each request is sent.
-
-### Authentication
-- **No Auth**, **Basic Auth**, **Bearer Token**, **API Key** (header or query), **Digest Auth**, **OAuth 1.0**, and **OAuth 2.0** (client credentials, password, and more).
-- Signing and token retrieval happen automatically, so you don't need to generate headers by hand.
-
-### Send & inspect
-- Send HTTP requests and read the result at a glance: **status codes are color-coded by range**, with **response time** and **response headers** shown.
-- A **line-numbered response viewer** handles large bodies comfortably, up to **50 MB** per response.
-
-### Import from cURL
-- Paste a `curl` command and Highway converts the method, URL, query params, headers, body (raw, `--data-urlencode`, multipart `-F`), and auth (`-u`, Basic/Bearer via the `Authorization` header) into an editable request.
-- **macOS Services integration**: select a `curl` command in any app, right-click → **Services → Open in Highway**, and the import dialog opens (or focuses your already-open window).
-- Optional **clipboard auto-detection** captures `curl` commands as you copy them, keeping a handy history in the sidebar.
-
-### Stay up to date
-- **Check for updates** from the sidebar to compare your version against the latest GitHub release.
-- Updates are **verified**: Highway picks the installer for your system, validates its published **SHA-256** checksum, and asks for confirmation before installing.
-
-### Your data, your files
-- Collections, requests, and variables are stored as JSON files in your user directory — no server, no account.
-- Collections from previous project versions or names are **migrated automatically**.
+- Organize requests into collections, with a sidebar tree, tabs, and inline renaming (double-click)
+- Build requests with separate tabs for method & URL, query params, headers, body, and authorization
+- Use `{{variables}}` anywhere, defined per collection and expanded before sending
+- Authenticate with No Auth, Basic, Bearer, API Key, Digest, OAuth 1.0, and OAuth 2.0
+- Send requests and read color-coded status, response time, and headers at a glance (up to 50 MB bodies)
+- Import `curl` commands directly, via the macOS Services menu, or from clipboard auto-detection
+- Check for updates, verified against the published SHA-256 checksum
+- Keep everything local as JSON files, with export/import and automatic migration
 
 ## Quick start
 
