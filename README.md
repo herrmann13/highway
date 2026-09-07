@@ -1,115 +1,104 @@
 # Highway
 
-Highway é um cliente HTTP desktop, leve e nativo (construído em Go com [Fyne](https://fyne.io)), para organizar, editar e executar requisições de API — uma alternativa simples a ferramentas como Postman ou Insomnia, com integração direta ao macOS e Linux.
+A fast, native API client for macOS and Linux. Organize, edit, and run your HTTP requests — locally, privately, no account required.
 
-## Funcionalidades
+![Highway](docs/screenshot.png)
 
-### Organização de requisições
-- **Coleções**: agrupe requisições relacionadas em coleções nomeadas, persistidas localmente em JSON.
-- **Árvore de navegação**: visualize coleções e requisições em uma árvore lateral, com renomeação inline (duplo clique) e exclusão.
-- **Abas**: cada requisição aberta vira uma aba de edição; reabrir uma requisição já aberta apenas foca a aba existente em vez de duplicá-la.
-- **Tipos de requisição**: identificação visual por tipo (HTTP, GraphQL, WebSocket, gRPC, SSE), cada um com ícone próprio na árvore.
+## Why Highway?
 
-### Editor de requisições
-- Método, URL, **Query Params**, **Headers**, **Body** (raw, `x-www-form-urlencoded` ou `multipart/form-data`) e **Authorization**, cada um em sua própria aba.
-- **Variáveis**: use `{{nome_da_variavel}}` em qualquer campo (URL, headers, body, autenticação) e defina os valores por coleção; a expansão acontece automaticamente antes do envio.
-- **Autenticação integrada**: No Auth, Basic Auth, Bearer Token, API Key (header ou query), Digest Auth, OAuth 1.0 e OAuth 2.0 (client credentials, entre outros grant types), com assinatura e obtenção de token feitas internamente.
+Highway keeps everything on your machine: your collections, requests, and variables live in plain JSON files in your own user directory — no cloud, no account, no telemetry. Paste a `curl` command and it becomes an editable request in one step, with familiar tabs and collections to keep your APIs organized.
 
-### Execução e resposta
-- Envio de requisições HTTP com suporte a status code colorido por faixa, tempo de resposta e headers de retorno.
-- Visualizador de resposta com numeração de linhas, otimizado para corpos grandes (limite de 50 MB por resposta).
-
-### Importação via cURL
-- **Importe comandos `curl` diretamente**, convertendo automaticamente método, URL, query params, headers, body (raw, `--data-urlencode`, multipart `-F`) e autenticação (`-u`, Basic/Bearer via header `Authorization`) em uma requisição editável.
-- **Integração com o menu de contexto do macOS**: selecione um comando `curl` em qualquer app, clique com o botão direito → `Services > Abrir no Highway`, e o Highway abre (ou foca a janela já aberta) com o diálogo de importação preenchido.
-- **Detecção automática via área de transferência**: ao copiar um comando `curl`, o Highway pode identificar o conteúdo automaticamente.
-- Comunicação entre instâncias via socket Unix local, garantindo que apenas uma instância do app rode por vez e que novas importações sejam roteadas para a janela já aberta.
-
-### Atualizações
-- **Verificação manual de atualizações**: o botão `Verificar atualizações`, na barra lateral, exibe a versão em uso e consulta a última release publicada no GitHub.
-- **Instalação verificada**: o Highway seleciona o instalador do sistema atual, valida seu SHA-256 publicado na release e pede confirmação antes de instalar.
-- **Linux**: instala o pacote `.deb` com autorização do sistema.
-- **macOS**: substitui o aplicativo instalado após o Highway ser fechado; a instalação em `/Applications` solicita autorização administrativa.
-
-### Armazenamento
-- Coleções, requisições e variáveis são salvas como arquivos JSON no diretório de configuração do usuário, sem dependência de servidor ou conta.
-- Migração automática de coleções de versões/nomes anteriores do projeto.
-
-## Instalação e build
+## Installation
 
 ### macOS
 
-Requisitos: Go, Xcode Command Line Tools e conexão com a internet na primeira execução (para baixar a ferramenta Fyne).
+Download the DMG for your architecture (Intel or Apple Silicon) from the [latest release](https://github.com/herrmann13/highway/releases), open it, and drag Highway into **Applications**. On first launch, right-click the app and choose **Open** to confirm you trust the unsigned build.
+
+### Linux
+
+Download the `.deb` package from the [latest release](https://github.com/herrmann13/highway/releases) and install it:
+
+```bash
+sudo apt install ./highway_0.1.0-1_amd64.deb
+```
+
+This installs the `highway` binary, an application-menu entry, and the app icon. Remove it at any time with `sudo apt remove highway`.
+
+> Prefer to build it yourself? See [Building from source](#building-from-source).
+
+## Features
+
+### Organize your requests
+- **Collections** group related requests and are saved locally as JSON.
+- A **tree** on the left shows your collections and requests, with inline renaming (double-click) and quick deletion.
+- Each request opens in its own **tab**; reopening one you already have open focuses its existing tab instead of duplicating it.
+- Requests are **visually tagged by type** (HTTP, GraphQL, WebSocket, gRPC, SSE), each with its own icon.
+
+### Build requests
+- Separate tabs for **method & URL**, **Query Params**, **Headers**, **Body**, and **Authorization**.
+- Body formats: **raw**, **`x-www-form-urlencoded`**, and **`multipart/form-data`**.
+
+### Variables
+- Reference `{{variable_name}}` in any field — URL, headers, body, or auth — and define the values per collection. Variables are expanded automatically before each request is sent.
+
+### Authentication
+- **No Auth**, **Basic Auth**, **Bearer Token**, **API Key** (header or query), **Digest Auth**, **OAuth 1.0**, and **OAuth 2.0** (client credentials, password, and more).
+- Signing and token retrieval happen automatically, so you don't need to generate headers by hand.
+
+### Send & inspect
+- Send HTTP requests and read the result at a glance: **status codes are color-coded by range**, with **response time** and **response headers** shown.
+- A **line-numbered response viewer** handles large bodies comfortably, up to **50 MB** per response.
+
+### Import from cURL
+- Paste a `curl` command and Highway converts the method, URL, query params, headers, body (raw, `--data-urlencode`, multipart `-F`), and auth (`-u`, Basic/Bearer via the `Authorization` header) into an editable request.
+- **macOS Services integration**: select a `curl` command in any app, right-click → **Services → Open in Highway**, and the import dialog opens (or focuses your already-open window).
+- Optional **clipboard auto-detection** captures `curl` commands as you copy them, keeping a handy history in the sidebar.
+
+### Stay up to date
+- **Check for updates** from the sidebar to compare your version against the latest GitHub release.
+- Updates are **verified**: Highway picks the installer for your system, validates its published **SHA-256** checksum, and asks for confirmation before installing.
+
+### Your data, your files
+- Collections, requests, and variables are stored as JSON files in your user directory — no server, no account.
+- Collections from previous project versions or names are **migrated automatically**.
+
+## Quick start
+
+1. Click **New Collection** to create a collection.
+2. Add a request from the collection menu, or import one from `curl` (Options → Import → cURL).
+3. Fill in the URL, hit **Send**, and inspect the response.
+
+## Export & import
+
+Use **Export** in the sidebar to save selected collections (with their requests and variables) to a JSON file. Restore them on another machine via Options → **Import → Collections**. Imports are additive and never delete existing data; duplicate names automatically get a suffix like `API (2)`.
+
+## Building from source
+
+Highway is built with Go and [Fyne](https://fyne.io).
+
+### macOS
 
 ```bash
 make macos
 ```
 
-O app será criado em `dist/Highway.app`. Arraste-o para `Aplicativos` ou abra-o diretamente. Como o build não é assinado, o macOS pode exigir clicar com o botão direito e escolher `Abrir` na primeira execução.
-
-Para gerar um DMG para distribuição, com o app e um atalho para `Aplicativos`:
+The app is created at `dist/Highway.app`. To build a distributable DMG:
 
 ```bash
 make macos-dmg VERSION=0.1.0
 ```
 
-O arquivo será criado em `dist/Highway-0.1.0-macos-<arquitetura>.dmg`. Abra o DMG, arraste o Highway para `Applications` e autorize a primeira abertura pelo menu contextual, se o macOS solicitar.
-
-Ao abrir o Highway instalado em `/Applications` pela primeira vez, o serviço "Abrir no Highway" é instalado automaticamente para o usuário atual. Se for necessário reinstalá-lo manualmente:
-
-```bash
-make macos-service
-```
-
 ### Linux (Ubuntu/Debian x86_64)
 
-Para gerar um pacote Debian instalável pelo sistema:
-
 ```bash
-sudo apt update
 sudo apt install -y build-essential libgl1-mesa-dev xorg-dev libxkbcommon-dev libwayland-dev librsvg2-bin
 make deb
-sudo apt install ./dist/highway_0.1.0-1_amd64.deb
 ```
-
-O pacote instala o binário em `/usr/bin/highway`, o lançador no menu de aplicativos e o ícone do Highway. Para remover:
-
-```bash
-sudo apt remove highway
-```
-
-Para distribuição portátil, `make linux` gera `dist/highway-linux-amd64.tar.gz`, contendo o binário, o lançador `highway.desktop` e o ícone. Para instalar apenas para o usuário atual:
-
-```bash
-mkdir -p ~/.local/bin ~/.local/share/applications ~/.local/share/icons/hicolor/512x512/apps
-cp dist/highway ~/.local/bin/highway
-cp dist/highway.desktop ~/.local/share/applications/highway.desktop
-cp dist/highway.png ~/.local/share/icons/hicolor/512x512/apps/highway.png
-chmod +x ~/.local/bin/highway
-```
-
-Garanta que `~/.local/bin` esteja no `PATH` e abra o Highway pelo menu de aplicativos ou com `highway` no terminal.
 
 ## Releases
 
-Publicar uma tag no formato `vMAJOR.MINOR.PATCH` aciona o workflow de release do GitHub. Ele gera DMGs macOS para Intel e Apple Silicon, o `.deb` para Linux x86_64 e o arquivo `SHA256SUMS` usado pelo atualizador.
+Pushing a `vMAJOR.MINOR.PATCH` tag triggers the GitHub release workflow, which produces macOS DMGs for Intel and Apple Silicon, the `.deb` for Linux, and the `SHA256SUMS` file used by the updater.
 
-```bash
-git tag v0.2.0
-git push origin v0.2.0
-```
+## License
 
-## Exportação e importação
-
-Use `Exportar` na barra lateral para selecionar coleções e salvar um arquivo JSON com suas rotas e variáveis. Para restaurar em outro computador, abra o menu `Importação` e selecione `Coleções`. A importação é aditiva e não remove dados existentes; nomes duplicados recebem automaticamente um sufixo, como `API (2)`.
-
-## Testes
-
-```bash
-make test
-```
-
-## Stack técnica
-
-- **Go** + **[Fyne](https://fyne.io)** para a interface gráfica nativa multiplataforma.
-- Empacotamento nativo para macOS (`.app`) e Linux (`.deb` ou binário + `.desktop`), via `fyne package` e Makefile.
+Released under the [MIT License](LICENSE).
