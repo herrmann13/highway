@@ -21,6 +21,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -1273,9 +1274,36 @@ func applyAuth(req *http.Request, cfg storage.AuthConfig) error {
 	return nil
 }
 
+type cachedOAuthToken struct {
+	token     string
+	expiresAt time.Time
+}
+
+var (
+	oauthTokenCacheMu sync.Mutex
+	oauthTokenCache   = map[string]cachedOAuthToken{}
+)
+
+// oauthCacheKey identifies a token as tied to the exact credentials/endpoint
+// that produced it, so switching client/account never reuses a stale token.
+func oauthCacheKey(cfg storage.AuthConfig) string {
+	return strings.Join([]string{
+		cfg.GrantType, cfg.TokenURL, cfg.ClientID, cfg.ClientSecret,
+		cfg.Username, cfg.Password, cfg.Scope,
+	}, "\x00")
+}
+
 func fetchToken(cfg storage.AuthConfig) (string, error) {
 	if strings.TrimSpace(cfg.TokenURL) == "" {
 		return "", fmt.Errorf("%s", i18n.T("err.auth.tokenURLEmpty"))
+	}
+
+	key := oauthCacheKey(cfg)
+	oauthTokenCacheMu.Lock()
+	cached, ok := oauthTokenCache[key]
+	oauthTokenCacheMu.Unlock()
+	if ok && time.Now().Before(cached.expiresAt) {
+		return cached.token, nil
 	}
 
 	form := url.Values{}
@@ -1307,6 +1335,7 @@ func fetchToken(cfg storage.AuthConfig) (string, error) {
 
 	var tokenResp struct {
 		AccessToken string `json:"access_token"`
+		ExpiresIn   int    `json:"expires_in"`
 	}
 	if err := json.Unmarshal(body, &tokenResp); err != nil {
 		return "", i18n.Errorf("err.auth.decodeToken", err)
@@ -1314,6 +1343,16 @@ func fetchToken(cfg storage.AuthConfig) (string, error) {
 	if tokenResp.AccessToken == "" {
 		return "", fmt.Errorf("%s", i18n.T("err.auth.missingAccessToken"))
 	}
+
+	// Only cache when the server tells us a lifetime; otherwise we can't
+	// tell a long-lived token from a one-time one, so fetch fresh each time.
+	const expirySkew = 30 * time.Second
+	if ttl := time.Duration(tokenResp.ExpiresIn)*time.Second - expirySkew; ttl > 0 {
+		oauthTokenCacheMu.Lock()
+		oauthTokenCache[key] = cachedOAuthToken{token: tokenResp.AccessToken, expiresAt: time.Now().Add(ttl)}
+		oauthTokenCacheMu.Unlock()
+	}
+
 	return tokenResp.AccessToken, nil
 }
 

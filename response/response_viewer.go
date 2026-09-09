@@ -30,6 +30,7 @@ func NewResponseHeadersViewer() *ResponseHeadersViewer {
 			label := widget.NewLabel("")
 			label.TextStyle = fyne.TextStyle{Monospace: true}
 			label.Truncation = fyne.TextTruncateEllipsis
+			label.Selectable = true
 			return label
 		},
 		func(id widget.ListItemID, item fyne.CanvasObject) {
@@ -63,6 +64,7 @@ func NewResponseViewer() *ResponseViewer {
 			label := widget.NewLabel("")
 			label.TextStyle = fyne.TextStyle{Monospace: true}
 			label.Truncation = fyne.TextTruncateEllipsis
+			label.Selectable = true
 			return label
 		},
 		func(id widget.ListItemID, item fyne.CanvasObject) {

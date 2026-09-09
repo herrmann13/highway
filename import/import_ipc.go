@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"syscall"
 	"time"
@@ -98,11 +99,27 @@ func LaunchHighwayWithImport(command string) error {
 	if err = file.Close(); err != nil {
 		return err
 	}
-	appPath := "/Applications/Highway.app"
-	if _, err = os.Stat(appPath); err != nil {
-		return fmt.Errorf("%s", i18n.T("err.import.appNotFound"))
+	switch runtime.GOOS {
+	case "darwin":
+		appPath := "/Applications/Highway.app"
+		if _, statErr := os.Stat(appPath); statErr != nil {
+			err = fmt.Errorf("%s", i18n.T("err.import.appNotFound"))
+			return err
+		}
+		err = exec.Command("/usr/bin/open", "-a", appPath, "--args", "--import-file", path).Start()
+		return err
+	case "linux":
+		bin, lookErr := exec.LookPath("highway")
+		if lookErr != nil {
+			err = fmt.Errorf("%s", i18n.T("err.import.appNotFound"))
+			return err
+		}
+		err = exec.Command(bin, "--import-file", path).Start()
+		return err
+	default:
+		err = fmt.Errorf("%s", i18n.T("err.import.appNotFound"))
+		return err
 	}
-	return exec.Command("/usr/bin/open", "-a", appPath, "--args", "--import-file", path).Start()
 }
 
 func isCurlCommand(command string) bool {
