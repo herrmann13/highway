@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"highway/curl"
+	"highway/i18n"
 	"highway/storage"
 )
 
@@ -33,18 +34,18 @@ func ImportCommandFromArgs(args []string, input io.Reader) (string, bool, error)
 		return "", false, nil
 	}
 	if len(args) != 2 || args[1] != "--curl-stdin" {
-		return "", true, fmt.Errorf("uso: highway import --curl-stdin")
+		return "", true, fmt.Errorf("%s", i18n.T("err.import.usage"))
 	}
 	data, err := io.ReadAll(io.LimitReader(input, maxCurlImportBytes+1))
 	if err != nil {
-		return "", true, fmt.Errorf("erro ao ler cURL: %w", err)
+		return "", true, i18n.Errorf("err.import.readCurl", err)
 	}
 	if len(data) > maxCurlImportBytes {
-		return "", true, fmt.Errorf("cURL excede o limite de %d MB", maxCurlImportBytes/(1024*1024))
+		return "", true, fmt.Errorf("%s", i18n.Tf("err.import.tooLarge", maxCurlImportBytes/(1024*1024)))
 	}
 	command := strings.TrimSpace(string(data))
 	if !isCurlCommand(command) {
-		return "", true, fmt.Errorf("o texto selecionado não é um comando cURL válido")
+		return "", true, fmt.Errorf("%s", i18n.T("err.import.notCurl"))
 	}
 	return command, true, nil
 }
@@ -54,19 +55,19 @@ func ImportFileFromArgs(args []string) (string, bool, error) {
 		return "", false, nil
 	}
 	if len(args) != 2 || args[1] == "" {
-		return "", true, fmt.Errorf("uso interno: highway --import-file <arquivo>")
+		return "", true, fmt.Errorf("%s", i18n.T("err.import.internalUsage"))
 	}
 	data, err := os.ReadFile(args[1])
 	_ = os.Remove(args[1])
 	if err != nil {
-		return "", true, fmt.Errorf("erro ao ler importação pendente: %w", err)
+		return "", true, i18n.Errorf("err.import.readPending", err)
 	}
 	if len(data) > maxCurlImportBytes {
-		return "", true, fmt.Errorf("cURL excede o limite de %d MB", maxCurlImportBytes/(1024*1024))
+		return "", true, fmt.Errorf("%s", i18n.Tf("err.import.tooLarge", maxCurlImportBytes/(1024*1024)))
 	}
 	command := strings.TrimSpace(string(data))
 	if !isCurlCommand(command) {
-		return "", true, fmt.Errorf("o texto selecionado não é um comando cURL válido")
+		return "", true, fmt.Errorf("%s", i18n.T("err.import.notCurl"))
 	}
 	return command, true, nil
 }
@@ -99,7 +100,7 @@ func LaunchHighwayWithImport(command string) error {
 	}
 	appPath := "/Applications/Highway.app"
 	if _, err = os.Stat(appPath); err != nil {
-		return fmt.Errorf("Highway.app não encontrado em /Applications")
+		return fmt.Errorf("%s", i18n.T("err.import.appNotFound"))
 	}
 	return exec.Command("/usr/bin/open", "-a", appPath, "--args", "--import-file", path).Start()
 }
@@ -166,7 +167,7 @@ func startImportServerAt(path string, handle func(string)) (func(), error) {
 	if _, err := os.Lstat(path); err == nil {
 		if conn, err := net.DialTimeout("unix", path, 250*time.Millisecond); err == nil {
 			conn.Close()
-			return nil, fmt.Errorf("outra instância do Highway já está em execução")
+			return nil, fmt.Errorf("%s", i18n.T("err.import.otherInstance"))
 		}
 		if err := os.Remove(path); err != nil {
 			return nil, err
@@ -208,9 +209,9 @@ func handleImportConnection(conn net.Conn, handle func(string)) {
 	if err == nil {
 		message.Command = strings.TrimSpace(message.Command)
 		if len(message.Command) > maxCurlImportBytes {
-			err = fmt.Errorf("cURL excede o limite de %d MB", maxCurlImportBytes/(1024*1024))
+			err = fmt.Errorf("%s", i18n.Tf("err.import.tooLarge", maxCurlImportBytes/(1024*1024)))
 		} else if !isCurlCommand(message.Command) {
-			err = errors.New("o texto selecionado não é um comando cURL válido")
+			err = errors.New(i18n.T("err.import.notCurl"))
 		}
 	}
 	if err == nil {

@@ -36,6 +36,7 @@ import (
 	"highway/backup"
 	"highway/clipboard"
 	"highway/curl"
+	"highway/i18n"
 	"highway/import"
 	"highway/request"
 	"highway/response"
@@ -102,9 +103,9 @@ func showRenameDialog(w fyne.Window, title, current string, validate func(string
 
 	d := dialog.NewForm(
 		title,
-		"Salvar",
-		"Cancelar",
-		[]*widget.FormItem{widget.NewFormItem("Nome", nameEntry)},
+		i18n.T("common.save"),
+		i18n.T("common.cancel"),
+		[]*widget.FormItem{widget.NewFormItem(i18n.T("common.name"), nameEntry)},
 		func(ok bool) {
 			if ok {
 				onSave(strings.TrimSpace(nameEntry.Text))
@@ -134,7 +135,7 @@ func main() {
 		}
 		delivered, err := importer.SendImportCommand(pendingImport)
 		if err != nil {
-			fmt.Fprintln(os.Stderr, "erro ao enviar importação para o Highway:", err)
+			fmt.Fprintln(os.Stderr, i18n.T("err.sendImport")+":", err)
 			return
 		}
 		if delivered {
@@ -146,6 +147,21 @@ func main() {
 		return
 	}
 	runHighway(pendingImport)
+}
+
+// uiCallbacks carries mutable state across view rebuilds triggered by a
+// language change.
+type uiCallbacks struct {
+	openCurlImport     func(string)
+	refreshCurlHistory func()
+	language           string
+	current            *requestRef
+	monitorCurl        atomic.Bool
+}
+
+type requestRef struct {
+	collection string
+	name       string
 }
 
 func runHighway(pendingImport string) {
@@ -162,6 +178,76 @@ func runHighway(pendingImport string) {
 	}
 	curlHistory := clipboard.NewCurlHistory(clipboard.DefaultCurlHistoryLimit)
 
+	cb := &uiCallbacks{
+		language: "pt",
+	}
+	cb.monitorCurl.Store(a.Preferences().BoolWithFallback("detect-curl", false))
+	if saved := a.Preferences().StringWithFallback("language", "pt"); saved == "en" || saved == "pt" {
+		cb.language = saved
+	}
+	i18n.SetLocale(cb.language)
+
+	var applyNewLocale func(string)
+	applyNewLocale = func(code string) {
+		if code == cb.language {
+			return
+		}
+		cb.language = code
+		i18n.SetLocale(code)
+		a.Preferences().SetString("language", code)
+		w.SetContent(buildMainContent(w, a, collections, curlHistory, cb, applyNewLocale))
+	}
+
+	w.SetContent(buildMainContent(w, a, collections, curlHistory, cb, applyNewLocale))
+	w.Resize(fyne.NewSize(1200, 750))
+
+	go func() {
+		ticker := time.NewTicker(time.Second)
+		defer ticker.Stop()
+		detector := &clipboard.CurlClipboardDetector{}
+		for range ticker.C {
+			if !cb.monitorCurl.Load() {
+				continue
+			}
+			command, detected := detector.Detect(w.Clipboard().Content())
+			if !detected {
+				continue
+			}
+			fyne.Do(func() {
+				if !cb.monitorCurl.Load() {
+					return
+				}
+				curlHistory.Add(command)
+				if cb.refreshCurlHistory != nil {
+					cb.refreshCurlHistory()
+				}
+			})
+		}
+	}()
+
+	closeImportServer, err := importer.StartImportServer(func(command string) {
+		fyne.Do(func() {
+			w.Show()
+			w.RequestFocus()
+			if cb.openCurlImport != nil {
+				cb.openCurlImport(command)
+			}
+		})
+	})
+	if err == nil {
+		defer closeImportServer()
+	}
+	if pendingImport != "" {
+		fyne.Do(func() {
+			if cb.openCurlImport != nil {
+				cb.openCurlImport(pendingImport)
+			}
+		})
+	}
+	w.ShowAndRun()
+}
+
+func buildMainContent(w fyne.Window, a fyne.App, collections []*storage.Collection, curlHistory *clipboard.CurlHistory, cb *uiCallbacks, setLanguage func(string)) fyne.CanvasObject {
 	tabs := container.NewDocTabs()
 	tabIndex := map[*container.TabItem]*requestTab{}
 
@@ -178,7 +264,7 @@ func runHighway(pendingImport string) {
 			return
 		}
 		if err := storage.UpsertRequest(collections, rt.collectionName, rt.name, rt.editor.toData(newName)); err != nil {
-			dialog.ShowInformation("Erro", err.Error(), w)
+			dialog.ShowInformation(i18n.T("common.error"), err.Error(), w)
 			return
 		}
 		rt.name = newName
@@ -210,6 +296,7 @@ func runHighway(pendingImport string) {
 
 	openTab := func(rd *storage.RequestData, collectionName string) {
 		if rd != nil && collectionName != "" {
+			cb.current = &requestRef{collection: collectionName, name: rd.Name}
 			for item, rt := range tabIndex {
 				if requestTabMatches(rt, collectionName, rd.Name) {
 					tabs.Select(item)
@@ -230,23 +317,23 @@ func runHighway(pendingImport string) {
 			}
 
 			nameEntry := widget.NewEntry()
-			nameEntry.SetPlaceHolder("Ex.: Listar usuários")
+			nameEntry.SetPlaceHolder(i18n.T("ph.requestName"))
 			nameEntry.Validator = func(name string) error {
 				name = strings.TrimSpace(name)
 				if name == "" {
-					return fmt.Errorf("informe o nome da requisição")
+					return fmt.Errorf("%s", i18n.T("err.requestNameRequired"))
 				}
 				if storage.RequestNameExists(c, name, -1) {
-					return fmt.Errorf("já existe uma requisição com o nome %q", name)
+					return fmt.Errorf("%s", i18n.Tf("err.requestNameExists", name))
 				}
 				return nil
 			}
 
 			d := dialog.NewForm(
-				"Nova requisição",
-				"Criar",
-				"Cancelar",
-				[]*widget.FormItem{widget.NewFormItem("Nome da requisição", nameEntry)},
+				i18n.T("dialog.newRequest"),
+				i18n.T("common.create"),
+				i18n.T("common.cancel"),
+				[]*widget.FormItem{widget.NewFormItem(i18n.T("form.requestName"), nameEntry)},
 				func(ok bool) {
 					if !ok {
 						return
@@ -255,7 +342,7 @@ func runHighway(pendingImport string) {
 					rd := storage.RequestData{Name: name, Type: request.HTTP}
 					c.Requests = append(c.Requests, rd)
 					if err := storage.SaveCollection(c); err != nil {
-						dialog.ShowInformation("Erro", err.Error(), w)
+						dialog.ShowInformation(i18n.T("common.error"), err.Error(), w)
 						return
 					}
 					openTab(&rd, colName)
@@ -271,16 +358,16 @@ func runHighway(pendingImport string) {
 
 	renameRequest = func(rt *requestTab) {
 		oldName := rt.name
-		showRenameDialog(w, "Renomear requisição", oldName, func(name string) error {
+		showRenameDialog(w, i18n.T("dialog.renameRequest"), oldName, func(name string) error {
 			if name == "" {
-				return fmt.Errorf("informe o nome da requisição")
+				return fmt.Errorf("%s", i18n.T("err.requestNameRequired"))
 			}
 			if rt.collectionName == "" {
 				return nil
 			}
 			for _, c := range collections {
 				if c.Name == rt.collectionName && storage.RequestNameExists(c, name, -1) && name != oldName {
-					return fmt.Errorf("já existe uma requisição com o nome %q", name)
+					return fmt.Errorf("%s", i18n.Tf("err.requestNameExists", name))
 				}
 			}
 			return nil
@@ -300,7 +387,7 @@ func runHighway(pendingImport string) {
 						c.Requests[i].Name = name
 						if err := storage.SaveCollection(c); err != nil {
 							c.Requests[i].Name = oldName
-							dialog.ShowInformation("Erro", err.Error(), w)
+							dialog.ShowInformation(i18n.T("common.error"), err.Error(), w)
 							return
 						}
 						break
@@ -315,6 +402,9 @@ func runHighway(pendingImport string) {
 				openTab.name = name
 				openTab.nameLabel.SetText(name)
 				openTab.item.Text = name
+			}
+			if cb.current != nil && cb.current.collection == rt.collectionName && cb.current.name == oldName {
+				cb.current.name = name
 			}
 			tabs.Refresh()
 			tree.Refresh()
@@ -333,19 +423,19 @@ func runHighway(pendingImport string) {
 			return
 		}
 
-		showRenameDialog(w, "Renomear coleção", oldName, func(name string) error {
+		showRenameDialog(w, i18n.T("dialog.renameCollection"), oldName, func(name string) error {
 			if name == "" {
-				return fmt.Errorf("informe o nome da coleção")
+				return fmt.Errorf("%s", i18n.T("err.collectionNameRequired"))
 			}
 			for _, c := range collections {
 				if c != target && c.Name == name {
-					return fmt.Errorf("já existe uma coleção com o nome %q", name)
+					return fmt.Errorf("%s", i18n.Tf("err.collectionNameExists", name))
 				}
 			}
 			return nil
 		}, func(name string) {
 			if err := storage.RenameCollection(target, name); err != nil {
-				dialog.ShowInformation("Erro", err.Error(), w)
+				dialog.ShowInformation(i18n.T("common.error"), err.Error(), w)
 				return
 			}
 			for _, rt := range tabIndex {
@@ -353,12 +443,15 @@ func runHighway(pendingImport string) {
 					rt.collectionName = name
 				}
 			}
+			if cb.current != nil && cb.current.collection == oldName {
+				cb.current.collection = name
+			}
 			tree.Refresh()
 		})
 	}
 
 	deleteRequestFlow := func(colName, reqName string) {
-		dialog.ShowConfirm("Excluir requisição", "Excluir a requisição \""+reqName+"\"?", func(ok bool) {
+		dialog.ShowConfirm(i18n.T("dialog.deleteRequest"), i18n.Tf("dialog.deleteRequest.body", reqName), func(ok bool) {
 			if !ok {
 				return
 			}
@@ -375,7 +468,7 @@ func runHighway(pendingImport string) {
 						c.Requests = append(c.Requests, request)
 						copy(c.Requests[i+1:], c.Requests[i:len(c.Requests)-1])
 						c.Requests[i] = request
-						dialog.ShowInformation("Erro", err.Error(), w)
+						dialog.ShowInformation(i18n.T("common.error"), err.Error(), w)
 						return
 					}
 					for item, rt := range tabIndex {
@@ -383,6 +476,9 @@ func runHighway(pendingImport string) {
 							tabs.Remove(item)
 							delete(tabIndex, item)
 						}
+					}
+					if cb.current != nil && cb.current.collection == colName && cb.current.name == reqName {
+						cb.current = nil
 					}
 					tree.Refresh()
 					return
@@ -392,12 +488,12 @@ func runHighway(pendingImport string) {
 	}
 
 	deleteCollectionFlow := func(colName string) {
-		dialog.ShowConfirm("Excluir", "Excluir a coleção \""+colName+"\"?", func(ok bool) {
+		dialog.ShowConfirm(i18n.T("dialog.deleteCollection"), i18n.Tf("dialog.deleteCollection.body", colName), func(ok bool) {
 			if !ok {
 				return
 			}
 			if err := storage.DeleteCollection(colName); err != nil {
-				dialog.ShowInformation("Erro", err.Error(), w)
+				dialog.ShowInformation(i18n.T("common.error"), err.Error(), w)
 				return
 			}
 			for i, c := range collections {
@@ -410,6 +506,9 @@ func runHighway(pendingImport string) {
 				if rt.collectionName == colName {
 					rt.collectionName = ""
 				}
+			}
+			if cb.current != nil && cb.current.collection == colName {
+				cb.current = nil
 			}
 			tree.Refresh()
 		}, w)
@@ -428,21 +527,21 @@ func runHighway(pendingImport string) {
 		}
 
 		var pairs *[]kvPair
-		section, pairs := keyValueSection("Adicionar variável", "base_url", "https://api.exemplo.com", target.Variables, func() {
+		section, pairs := keyValueSection(i18n.T("kv.addVariable"), "base_url", "https://api.exemplo.com", target.Variables, func() {
 			variables := snapshotPairs(*pairs)
 			if _, err := variable.VariableValues(variables); err != nil {
-				dialog.ShowInformation("Variáveis", err.Error(), w)
+				dialog.ShowInformation(i18n.T("variables.title"), err.Error(), w)
 				return
 			}
 			previous := target.Variables
 			target.Variables = variables
 			if err := storage.SaveCollection(target); err != nil {
 				target.Variables = previous
-				dialog.ShowInformation("Erro", err.Error(), w)
+				dialog.ShowInformation(i18n.T("common.error"), err.Error(), w)
 			}
 		}, func() *variable.VariableEntry { return variable.NewVariableEntry(false, false, nil) })
 
-		d := dialog.NewCustom("Variáveis: "+target.Name, "Fechar", section, w)
+		d := dialog.NewCustom(i18n.Tf("variables.collectionTitle", target.Name), i18n.T("common.close"), section, w)
 		d.Resize(fyne.NewSize(680, 420))
 		d.Show()
 	}
@@ -452,13 +551,13 @@ func runHighway(pendingImport string) {
 		if c == nil {
 			return
 		}
-		newItem := fyne.NewMenuItem("Nova requisição", func() {
+		newItem := fyne.NewMenuItem(i18n.T("menu.newRequest"), func() {
 			createRequestInCollection(colName)
 		})
-		variablesItem := fyne.NewMenuItem("Variáveis", func() {
+		variablesItem := fyne.NewMenuItem(i18n.T("menu.variables"), func() {
 			showCollectionVariables(colName)
 		})
-		deleteItem := fyne.NewMenuItem("Excluir coleção", func() {
+		deleteItem := fyne.NewMenuItem(i18n.T("menu.deleteCollection"), func() {
 			deleteCollectionFlow(colName)
 		})
 		pop := widget.NewPopUpMenu(fyne.NewMenu("", newItem, variablesItem, deleteItem), c)
@@ -559,37 +658,46 @@ func runHighway(pendingImport string) {
 
 	tabs.CreateTab = func() *container.TabItem { return addTab(nil, "") }
 	tabs.OnClosed = func(item *container.TabItem) {
+		rt := tabIndex[item]
 		delete(tabIndex, item)
+		if rt != nil && cb.current != nil && rt.collectionName == cb.current.collection && rt.name == cb.current.name {
+			cb.current = nil
+		}
+	}
+	tabs.OnSelected = func(item *container.TabItem) {
+		if rt, ok := tabIndex[item]; ok && rt.collectionName != "" {
+			cb.current = &requestRef{collection: rt.collectionName, name: rt.name}
+		}
 	}
 
-	newCollectionButton := widget.NewButtonWithIcon("Nova Coleção", theme.ContentAddIcon(), func() {
+	newCollectionButton := widget.NewButtonWithIcon(i18n.T("button.newCollection"), theme.ContentAddIcon(), func() {
 		nameEntry := widget.NewEntry()
-		nameEntry.SetPlaceHolder("Ex.: API de usuários")
+		nameEntry.SetPlaceHolder(i18n.T("ph.collectionName"))
 		nameEntry.Validator = func(name string) error {
 			name = strings.TrimSpace(name)
 			if name == "" {
-				return fmt.Errorf("informe o nome da coleção")
+				return fmt.Errorf("%s", i18n.T("err.collectionNameRequired"))
 			}
 			for _, c := range collections {
 				if c.Name == name {
-					return fmt.Errorf("já existe uma coleção com o nome %q", name)
+					return fmt.Errorf("%s", i18n.Tf("err.collectionNameExists", name))
 				}
 			}
 			return nil
 		}
 
 		d := dialog.NewForm(
-			"Nova coleção",
-			"Criar",
-			"Cancelar",
-			[]*widget.FormItem{widget.NewFormItem("Nome da coleção", nameEntry)},
+			i18n.T("dialog.newCollection"),
+			i18n.T("common.create"),
+			i18n.T("common.cancel"),
+			[]*widget.FormItem{widget.NewFormItem(i18n.T("form.collectionName"), nameEntry)},
 			func(ok bool) {
 				if !ok {
 					return
 				}
 				c := &storage.Collection{Name: strings.TrimSpace(nameEntry.Text)}
 				if err := storage.SaveCollection(c); err != nil {
-					dialog.ShowInformation("Erro", err.Error(), w)
+					dialog.ShowInformation(i18n.T("common.error"), err.Error(), w)
 					return
 				}
 				collections = append(collections, c)
@@ -605,10 +713,9 @@ func runHighway(pendingImport string) {
 	var showCurlImportDialog func(string)
 	showCurlImportDialog = func(command string) {
 		if len(collections) == 0 {
-			dialog.ShowInformation("Importação", "Crie uma coleção antes de importar uma requisição.", w)
+			dialog.ShowInformation(i18n.T("menu.import"), i18n.T("info.createCollectionFirst"), w)
 			return
 		}
-
 		collectionNames := make([]string, 0, len(collections))
 		for _, c := range collections {
 			collectionNames = append(collectionNames, c.Name)
@@ -622,19 +729,19 @@ func runHighway(pendingImport string) {
 
 		curlEntry := widget.NewMultiLineEntry()
 		curlEntry.SetMinRowsVisible(10)
-		curlEntry.SetPlaceHolder("curl https://api.exemplo.com/usuarios -H 'Accept: application/json'")
+		curlEntry.SetPlaceHolder(i18n.T("ph.curlExample"))
 		if command == "" {
 			command = w.Clipboard().Content()
 		}
 		curlEntry.SetText(command)
 
 		d := dialog.NewForm(
-			"Importar cURL",
-			"Importar",
-			"Cancelar",
+			i18n.T("dialog.importCurl"),
+			i18n.T("common.import"),
+			i18n.T("common.cancel"),
 			[]*widget.FormItem{
-				widget.NewFormItem("Collection", destination),
-				widget.NewFormItem("Comando cURL", curlEntry),
+				widget.NewFormItem(i18n.T("menu.collections"), destination),
+				widget.NewFormItem(i18n.T("form.curlCommand"), curlEntry),
 			},
 			func(ok bool) {
 				if !ok {
@@ -642,18 +749,18 @@ func runHighway(pendingImport string) {
 				}
 				rd, err := curl.ParseCurl(curlEntry.Text)
 				if err != nil {
-					dialog.ShowInformation("cURL inválido", err.Error(), w)
+					dialog.ShowInformation(i18n.T("dialog.invalidCurl"), err.Error(), w)
 					return
 				}
 				for _, c := range collections {
 					if c.Name != destination.Selected {
 						continue
 					}
-					rd.Name = storage.UniqueRequestName(c, "Importação cURL")
+					rd.Name = storage.UniqueRequestName(c, i18n.T("request.curlImportName"))
 					c.Requests = append(c.Requests, rd)
 					if err := storage.SaveCollection(c); err != nil {
 						c.Requests = c.Requests[:len(c.Requests)-1]
-						dialog.ShowInformation("Erro", err.Error(), w)
+						dialog.ShowInformation(i18n.T("common.error"), err.Error(), w)
 						return
 					}
 					selectedCollection = c.Name
@@ -661,7 +768,7 @@ func runHighway(pendingImport string) {
 					tree.Refresh()
 					return
 				}
-				dialog.ShowInformation("Importação", "Selecione uma collection válida para importar.", w)
+				dialog.ShowInformation(i18n.T("menu.import"), i18n.T("err.selectCollection"), w)
 			},
 			w,
 		)
@@ -670,13 +777,13 @@ func runHighway(pendingImport string) {
 	}
 
 	var optionsButton *widget.Button
-	optionsButton = widget.NewButton("Opções", func() {
+	optionsButton = widget.NewButton(i18n.T("button.options"), func() {
 		c := fyne.CurrentApp().Driver().CanvasForObject(optionsButton)
 		if c == nil {
 			return
 		}
 		curlItem := fyne.NewMenuItem("cURL", func() { showCurlImportDialog("") })
-		collectionsItem := fyne.NewMenuItem("Coleções", func() {
+		collectionsItem := fyne.NewMenuItem(i18n.T("menu.collections"), func() {
 			backup.ShowImportCollectionsDialog(w, collections, func(imported []*storage.Collection) {
 				if err := backup.SaveImportedCollections(imported); err != nil {
 					dialog.ShowError(err, w)
@@ -684,57 +791,35 @@ func runHighway(pendingImport string) {
 				}
 				collections = append(collections, imported...)
 				tree.Refresh()
-				dialog.ShowInformation("Importar coleções", fmt.Sprintf("%d coleção(ões) importada(s).", len(imported)), w)
+				dialog.ShowInformation(i18n.T("importCollections.title"), i18n.Tf("info.collectionsImported", len(imported)), w)
 			})
 		})
-		importItem := fyne.NewMenuItem("Importação", nil)
+		importItem := fyne.NewMenuItem(i18n.T("menu.import"), nil)
 		importItem.ChildMenu = fyne.NewMenu("", curlItem, collectionsItem)
-		exportItem := fyne.NewMenuItem("Exportar", func() {
+		exportItem := fyne.NewMenuItem(i18n.T("menu.export"), func() {
 			backup.ShowExportCollectionsDialog(w, collections)
 		})
-		updateItem := fyne.NewMenuItem("Verificar atualizações", func() {
+		updateItem := fyne.NewMenuItem(i18n.T("menu.checkUpdates"), func() {
 			update.CheckForUpdates(a, w, optionsButton)
 		})
-		pop := widget.NewPopUpMenu(fyne.NewMenu("", importItem, exportItem, updateItem), c)
+		languageItem := fyne.NewMenuItem(i18n.T("menu.language"), nil)
+		languageItem.ChildMenu = fyne.NewMenu("",
+			fyne.NewMenuItem(i18n.T("lang.pt"), func() { setLanguage("pt") }),
+			fyne.NewMenuItem(i18n.T("lang.en"), func() { setLanguage("en") }),
+		)
+		pop := widget.NewPopUpMenu(fyne.NewMenu("", importItem, exportItem, updateItem, languageItem), c)
 		pos := fyne.CurrentApp().Driver().AbsolutePositionForObject(optionsButton)
 		pop.ShowAtPosition(pos.Add(fyne.NewPos(0, optionsButton.Size().Height)))
 	})
 
-	var monitorCurl atomic.Bool
-	monitorCurl.Store(a.Preferences().BoolWithFallback("detect-curl", false))
-	var refreshCurlHistory func()
-	monitorCheck := widget.NewCheck("Detectar cURLs", func(enabled bool) {
-		monitorCurl.Store(enabled)
+	monitorCheck := widget.NewCheck(i18n.T("checkbox.detectCurl"), func(enabled bool) {
+		cb.monitorCurl.Store(enabled)
 		a.Preferences().SetBool("detect-curl", enabled)
-		if refreshCurlHistory != nil {
-			refreshCurlHistory()
+		if cb.refreshCurlHistory != nil {
+			cb.refreshCurlHistory()
 		}
 	})
-	monitorCheck.SetChecked(monitorCurl.Load())
-
-	go func() {
-		ticker := time.NewTicker(time.Second)
-		defer ticker.Stop()
-		detector := &clipboard.CurlClipboardDetector{}
-		for range ticker.C {
-			if !monitorCurl.Load() {
-				continue
-			}
-			command, detected := detector.Detect(w.Clipboard().Content())
-			if !detected {
-				continue
-			}
-			fyne.Do(func() {
-				if !monitorCurl.Load() {
-					return
-				}
-				curlHistory.Add(command)
-				if refreshCurlHistory != nil {
-					refreshCurlHistory()
-				}
-			})
-		}
-	}()
+	monitorCheck.SetChecked(cb.monitorCurl.Load())
 
 	versionLabel := widget.NewLabel("v" + version.AppVersion)
 	actionBar := container.NewVBox(
@@ -763,23 +848,18 @@ func runHighway(pendingImport string) {
 		historyList.Unselect(id)
 		showCurlImportDialog(command)
 	}
-	historyEmpty := widget.NewLabel("")
+	historyEmpty := widget.NewLabel(i18n.T("label.clipboard.empty"))
 	historyEmpty.Wrapping = fyne.TextWrapWord
 	historyContent := container.NewStack(historyEmpty, historyList)
 	historyPanel := container.NewGridWrap(
 		fyne.NewSize(240, 180),
 		container.NewBorder(
-			container.NewVBox(widget.NewSeparator(), widget.NewLabel("Área de transferência")),
+			container.NewVBox(widget.NewSeparator(), widget.NewLabel(i18n.T("label.clipboard"))),
 			nil, nil, nil, historyContent,
 		),
 	)
-	refreshCurlHistory = func() {
+	refreshCurlHistory := func() {
 		if len(curlHistory.Entries()) == 0 {
-			if monitorCurl.Load() {
-				historyEmpty.SetText("Nenhum cURL copiado nesta sessão.")
-			} else {
-				historyEmpty.SetText("Ative Detectar cURLs para registrar cópias.")
-			}
 			historyList.Hide()
 			historyEmpty.Show()
 			return
@@ -788,6 +868,7 @@ func runHighway(pendingImport string) {
 		historyList.Show()
 		historyList.Refresh()
 	}
+	cb.refreshCurlHistory = refreshCurlHistory
 	refreshCurlHistory()
 
 	sidebar := container.NewBorder(actionBar, historyPanel, nil, nil, container.NewScroll(tree))
@@ -795,24 +876,26 @@ func runHighway(pendingImport string) {
 	split := container.NewHSplit(sidebar, tabs)
 	split.SetOffset(0.22)
 
+	cb.openCurlImport = showCurlImportDialog
+
+	if cb.current != nil && cb.current.collection != "" {
+		for _, c := range collections {
+			if c.Name != cb.current.collection {
+				continue
+			}
+			for i := range c.Requests {
+				if c.Requests[i].Name == cb.current.name {
+					rd := c.Requests[i]
+					openTab(&rd, c.Name)
+					return split
+				}
+			}
+		}
+	}
+
 	openTab(nil, "")
 
-	w.SetContent(split)
-	w.Resize(fyne.NewSize(1200, 750))
-	closeImportServer, err := importer.StartImportServer(func(command string) {
-		fyne.Do(func() {
-			w.Show()
-			w.RequestFocus()
-			showCurlImportDialog(command)
-		})
-	})
-	if err == nil {
-		defer closeImportServer()
-	}
-	if pendingImport != "" {
-		fyne.Do(func() { showCurlImportDialog(pendingImport) })
-	}
-	w.ShowAndRun()
+	return split
 }
 
 func treeChildUIDs(uid string, collections []*storage.Collection) []string {
@@ -904,11 +987,26 @@ func sectionPanel(title string, accent, bg color.Color, content fyne.CanvasObjec
 }
 
 func showError(statusText *canvas.Text, responseBody *response.ResponseViewer, responseHeaders *response.ResponseHeadersViewer, err error) {
-	statusText.Text = "Erro: " + err.Error()
+	fullText := i18n.T("error.prefix") + err.Error()
+	statusText.Text = statusSummary(fullText)
 	statusText.Color = errorColor()
 	statusText.Refresh()
-	responseBody.Clear()
+	responseBody.SetResponse(fullText, response.ResponseLines(fullText))
 	responseHeaders.Clear()
+}
+
+// statusSummary shortens text for the single-line, unwrapped status bar;
+// the full text remains readable in the wrapped/scrollable response body.
+func statusSummary(text string) string {
+	const maxRunes = 160
+	if idx := strings.IndexByte(text, '\n'); idx >= 0 {
+		text = text[:idx]
+	}
+	runes := []rune(text)
+	if len(runes) <= maxRunes {
+		return text
+	}
+	return string(runes[:maxRunes]) + "…"
 }
 
 func statusColor(code int) color.Color {
@@ -960,7 +1058,7 @@ func keyValueSection(addLabel, keyPlaceholder, valuePlaceholder string, defaults
 			pair.value.OnChanged = func(string) { onChange() }
 		}
 
-		removeButton := widget.NewButton("Remover", func() {
+		removeButton := widget.NewButton(i18n.T("kv.remove"), func() {
 			list.Remove(pair.row)
 			for i := range pairs {
 				if pairs[i].key == pair.key {
@@ -994,8 +1092,8 @@ func keyValueSection(addLabel, keyPlaceholder, valuePlaceholder string, defaults
 	})
 
 	headerRow := container.NewGridWithColumns(3,
-		widget.NewLabelWithStyle("Chave", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
-		widget.NewLabelWithStyle("Valor", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
+		widget.NewLabelWithStyle(i18n.T("kv.key"), fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
+		widget.NewLabelWithStyle(i18n.T("kv.value"), fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
 		widget.NewLabel(""),
 	)
 	addRow := container.NewGridWithColumns(3, keyEntry, valueEntry, addButton)
@@ -1027,7 +1125,7 @@ func buildBody(bodyType, raw string, form, mp [][2]string) (io.Reader, string, e
 			}
 			fw, err := mw.CreateFormField(p[0])
 			if err != nil {
-				return nil, "", fmt.Errorf("erro no campo multipart %s: %w", p[0], err)
+				return nil, "", fmt.Errorf("%s: %w", i18n.Tf("err.send.multipartField", p[0]), err)
 			}
 			if _, err := fw.Write([]byte(p[1])); err != nil {
 				return nil, "", err
@@ -1047,10 +1145,10 @@ func sendRequest(method, rawURL string, params, headers [][2]string, reqBody io.
 
 	u, err := url.Parse(rawURL)
 	if err != nil {
-		return result, fmt.Errorf("url inválida: %w", err)
+		return result, i18n.Errorf("err.send.invalidURL", err)
 	}
 	if u.Scheme == "" {
-		return result, fmt.Errorf("url deve conter esquema (http:// ou https://)")
+		return result, fmt.Errorf("%s", i18n.T("err.send.scheme"))
 	}
 
 	q := u.Query()
@@ -1066,7 +1164,7 @@ func sendRequest(method, rawURL string, params, headers [][2]string, reqBody io.
 	if reqBody != nil {
 		bodyBytes, err = io.ReadAll(reqBody)
 		if err != nil {
-			return result, fmt.Errorf("erro ao ler body: %w", err)
+			return result, i18n.Errorf("err.send.readBody", err)
 		}
 	}
 
@@ -1077,7 +1175,7 @@ func sendRequest(method, rawURL string, params, headers [][2]string, reqBody io.
 		}
 		req, err := http.NewRequest(method, u.String(), reader)
 		if err != nil {
-			return nil, fmt.Errorf("erro ao criar request: %w", err)
+			return nil, i18n.Errorf("err.send.createRequest", err)
 		}
 		for _, h := range headers {
 			if h[0] == "" {
@@ -1108,16 +1206,16 @@ func sendRequest(method, rawURL string, params, headers [][2]string, reqBody io.
 		resp, err = client.Do(req)
 	}
 	if err != nil {
-		return result, fmt.Errorf("erro na request: %w", err)
+		return result, i18n.Errorf("err.send.request", err)
 	}
 	defer resp.Body.Close()
 
 	respBody, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes+1))
 	if err != nil {
-		return result, fmt.Errorf("erro ao ler resposta: %w", err)
+		return result, i18n.Errorf("err.send.readResponse", err)
 	}
 	if len(respBody) > maxResponseBytes {
-		return result, fmt.Errorf("resposta excede o limite de %d MB", maxResponseBytes/(1024*1024))
+		return result, fmt.Errorf("%s", i18n.Tf("err.send.responseTooLarge", maxResponseBytes/(1024*1024)))
 	}
 
 	result.statusCode = resp.StatusCode
@@ -1134,21 +1232,21 @@ func applyAuth(req *http.Request, cfg storage.AuthConfig) error {
 		return nil
 	case "Bearer Token":
 		if strings.TrimSpace(cfg.Token) == "" {
-			return fmt.Errorf("token bearer vazio")
+			return fmt.Errorf("%s", i18n.T("err.auth.bearerEmpty"))
 		}
 		req.Header.Set("Authorization", "Bearer "+cfg.Token)
 	case "Basic Auth":
 		if strings.TrimSpace(cfg.BasicUser) == "" {
-			return fmt.Errorf("usuário vazio")
+			return fmt.Errorf("%s", i18n.T("err.auth.userEmpty"))
 		}
 		token := base64.StdEncoding.EncodeToString([]byte(cfg.BasicUser + ":" + cfg.BasicPass))
 		req.Header.Set("Authorization", "Basic "+token)
 	case "API Key":
 		if strings.TrimSpace(cfg.APIKeyName) == "" {
-			return fmt.Errorf("nome da API Key vazio")
+			return fmt.Errorf("%s", i18n.T("err.auth.apiKeyNameEmpty"))
 		}
 		if strings.TrimSpace(cfg.APIKeyValue) == "" {
-			return fmt.Errorf("valor da API Key vazio")
+			return fmt.Errorf("%s", i18n.T("err.auth.apiKeyValueEmpty"))
 		}
 		if cfg.APIKeyLocation == "query" {
 			query := req.URL.Query()
@@ -1170,14 +1268,14 @@ func applyAuth(req *http.Request, cfg storage.AuthConfig) error {
 		}
 		req.Header.Set("Authorization", "Bearer "+token)
 	default:
-		return fmt.Errorf("tipo de autenticação desconhecido: %s", cfg.AuthType)
+		return fmt.Errorf("%s", i18n.Tf("err.auth.unknownType", cfg.AuthType))
 	}
 	return nil
 }
 
 func fetchToken(cfg storage.AuthConfig) (string, error) {
 	if strings.TrimSpace(cfg.TokenURL) == "" {
-		return "", fmt.Errorf("token URL vazia")
+		return "", fmt.Errorf("%s", i18n.T("err.auth.tokenURLEmpty"))
 	}
 
 	form := url.Values{}
@@ -1195,26 +1293,26 @@ func fetchToken(cfg storage.AuthConfig) (string, error) {
 	client := &http.Client{Timeout: 30 * time.Second}
 	resp, err := client.PostForm(cfg.TokenURL, form)
 	if err != nil {
-		return "", fmt.Errorf("erro ao buscar token: %w", err)
+		return "", i18n.Errorf("err.auth.fetchToken", err)
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return "", fmt.Errorf("erro ao ler resposta do token: %w", err)
+		return "", i18n.Errorf("err.auth.readTokenResponse", err)
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return "", fmt.Errorf("token endpoint retornou %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
+		return "", fmt.Errorf("%s", i18n.Tf("err.auth.tokenEndpoint", resp.StatusCode, strings.TrimSpace(string(body))))
 	}
 
 	var tokenResp struct {
 		AccessToken string `json:"access_token"`
 	}
 	if err := json.Unmarshal(body, &tokenResp); err != nil {
-		return "", fmt.Errorf("erro ao decodificar token: %w", err)
+		return "", i18n.Errorf("err.auth.decodeToken", err)
 	}
 	if tokenResp.AccessToken == "" {
-		return "", fmt.Errorf("access_token não encontrado na resposta")
+		return "", fmt.Errorf("%s", i18n.T("err.auth.missingAccessToken"))
 	}
 	return tokenResp.AccessToken, nil
 }
@@ -1268,7 +1366,7 @@ func buildDigestHeader(method string, u *url.URL, challenge, username, password 
 	opaque := params["opaque"]
 
 	if nonce == "" {
-		return "", fmt.Errorf("digest: nonce ausente no challenge")
+		return "", fmt.Errorf("%s", i18n.T("err.digest.nonce"))
 	}
 
 	uri := u.RequestURI()
@@ -1350,7 +1448,7 @@ func randomHex(n int) string {
 
 func buildOAuth1Header(req *http.Request, cfg storage.AuthConfig) (string, error) {
 	if strings.TrimSpace(cfg.OAuth1ConsumerKey) == "" {
-		return "", fmt.Errorf("consumer key vazio")
+		return "", fmt.Errorf("%s", i18n.T("err.oauth1.consumerKey"))
 	}
 	sigMethod := cfg.OAuth1SignatureMethod
 	if sigMethod == "" {
@@ -1426,7 +1524,7 @@ func oauthSign(method, key, baseString string) (string, error) {
 		mac.Write([]byte(baseString))
 		return base64.StdEncoding.EncodeToString(mac.Sum(nil)), nil
 	default:
-		return "", fmt.Errorf("signature method desconhecido: %s", method)
+		return "", fmt.Errorf("%s", i18n.Tf("err.oauth1.signatureMethod", method))
 	}
 }
 

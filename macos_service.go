@@ -8,6 +8,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+
+	"highway/i18n"
 )
 
 const (
@@ -51,7 +53,7 @@ func installMacOSService(destination, binaryPath string) (bool, error) {
 		return false, err
 	}
 	if !bytes.Contains(workflow, []byte(macOSServiceBinaryToken)) {
-		return false, errors.New("template do serviço macOS sem caminho do Highway")
+		return false, errors.New(i18n.T("err.service.template"))
 	}
 	workflow = bytes.ReplaceAll(workflow, []byte(macOSServiceBinaryToken), []byte(binaryPath))
 

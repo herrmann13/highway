@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"highway/i18n"
 )
 
 type RequestData struct {
@@ -115,7 +117,7 @@ func MigrateCollections(sourceDir, destinationDir string) error {
 		if err != nil {
 			return err
 		}
-		if err := os.WriteFile(destination, data, 0o644); err != nil {
+		if err := os.WriteFile(destination, data, 0o600); err != nil {
 			return err
 		}
 	}
@@ -154,16 +156,42 @@ func LoadCollections() ([]*Collection, error) {
 	return result, nil
 }
 
+// ensureFileAvailableFor reports an error if path already holds a collection
+// with a different name; different collection names can sanitize to the same
+// filename (e.g. "A/B" and "A B"), which would otherwise silently overwrite
+// one collection's data with another's.
+func ensureFileAvailableFor(path, name string) error {
+	data, err := os.ReadFile(path)
+	if os.IsNotExist(err) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	var existing Collection
+	if err := json.Unmarshal(data, &existing); err != nil {
+		return nil
+	}
+	if existing.Name != name {
+		return fmt.Errorf("%s", i18n.Tf("err.storage.filenameCollision", name, existing.Name))
+	}
+	return nil
+}
+
 func SaveCollection(c *Collection) error {
 	dir, err := CollectionsDir()
 	if err != nil {
+		return err
+	}
+	path := CollectionFilePath(dir, c.Name)
+	if err := ensureFileAvailableFor(path, c.Name); err != nil {
 		return err
 	}
 	data, err := json.MarshalIndent(c, "", "  ")
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(CollectionFilePath(dir, c.Name), data, 0o644)
+	return os.WriteFile(path, data, 0o600)
 }
 
 func RenameCollection(c *Collection, name string) error {
@@ -176,6 +204,11 @@ func RenameCollection(c *Collection, name string) error {
 		return err
 	}
 
+	newPath := CollectionFilePath(dir, name)
+	if err := ensureFileAvailableFor(newPath, name); err != nil {
+		return err
+	}
+
 	renamed := *c
 	renamed.Name = name
 	data, err := json.MarshalIndent(&renamed, "", "  ")
@@ -184,8 +217,7 @@ func RenameCollection(c *Collection, name string) error {
 	}
 
 	oldPath := CollectionFilePath(dir, c.Name)
-	newPath := CollectionFilePath(dir, name)
-	if err := os.WriteFile(newPath, data, 0o644); err != nil {
+	if err := os.WriteFile(newPath, data, 0o600); err != nil {
 		return err
 	}
 	if oldPath != newPath {
@@ -216,7 +248,7 @@ func UpsertRequest(collections []*Collection, colName, oldName string, rd Reques
 			for i := range c.Requests {
 				if c.Requests[i].Name == oldName {
 					if rd.Name != oldName && RequestNameExists(c, rd.Name, i) {
-						return fmt.Errorf("já existe uma requisição com o nome %q", rd.Name)
+						return fmt.Errorf("%s", i18n.Tf("err.requestNameExists", rd.Name))
 					}
 					c.Requests[i] = rd
 					return SaveCollection(c)
@@ -224,12 +256,12 @@ func UpsertRequest(collections []*Collection, colName, oldName string, rd Reques
 			}
 		}
 		if RequestNameExists(c, rd.Name, -1) {
-			return fmt.Errorf("já existe uma requisição com o nome %q", rd.Name)
+			return fmt.Errorf("%s", i18n.Tf("err.requestNameExists", rd.Name))
 		}
 		c.Requests = append(c.Requests, rd)
 		return SaveCollection(c)
 	}
-	return fmt.Errorf("coleção não encontrada: %s", colName)
+	return fmt.Errorf("%s", i18n.Tf("err.storage.collectionNotFound", colName))
 }
 
 func RequestNameExists(c *Collection, name string, except int) bool {

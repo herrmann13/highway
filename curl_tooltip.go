@@ -79,12 +79,40 @@ func (l *curlHistoryLabel) showTooltip(text string) {
 	if canvas == nil {
 		return
 	}
+	canvasSize := canvas.Size()
+
+	maxWidth := float32(600)
+	if available := canvasSize.Width - 40; available < maxWidth {
+		maxWidth = available
+	}
+	if maxWidth < 200 {
+		maxWidth = 200
+	}
+
 	content := widget.NewLabel(text)
 	content.TextStyle = fyne.TextStyle{Monospace: true}
-	content.Wrapping = fyne.TextWrapOff
+	content.Wrapping = fyne.TextWrapWord
+	content.Resize(fyne.NewSize(maxWidth, 10))
+	wrappedSize := content.MinSize()
+	content.Resize(wrappedSize)
+
 	popup := widget.NewPopUp(content, canvas)
+
 	position := fyne.CurrentApp().Driver().AbsolutePositionForObject(l)
-	popup.ShowAtPosition(position.Add(fyne.NewPos(0, l.Size().Height+4)))
+	pos := position.Add(fyne.NewPos(0, l.Size().Height+4))
+	if pos.X+wrappedSize.Width > canvasSize.Width {
+		pos.X = canvasSize.Width - wrappedSize.Width
+	}
+	if pos.X < 0 {
+		pos.X = 0
+	}
+	if pos.Y+wrappedSize.Height > canvasSize.Height {
+		pos.Y = canvasSize.Height - wrappedSize.Height
+	}
+	if pos.Y < 0 {
+		pos.Y = 0
+	}
+	popup.ShowAtPosition(pos)
 
 	l.mu.Lock()
 	if l.hovered {

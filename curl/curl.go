@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"strings"
 
+	"highway/i18n"
 	"highway/request"
 	"highway/storage"
 )
@@ -16,7 +17,7 @@ func ParseCurl(command string) (storage.RequestData, error) {
 		return storage.RequestData{}, err
 	}
 	if len(args) == 0 || args[0] != "curl" {
-		return storage.RequestData{}, fmt.Errorf("o comando deve começar com curl")
+		return storage.RequestData{}, fmt.Errorf("%s", i18n.T("err.curl.notCurl"))
 	}
 
 	rd := storage.RequestData{Type: request.HTTP, Method: "GET", BodyType: "raw"}
@@ -28,7 +29,7 @@ func ParseCurl(command string) (storage.RequestData, error) {
 	nextValue := func(index *int, option string) (string, error) {
 		*index = *index + 1
 		if *index >= len(args) {
-			return "", fmt.Errorf("a opção %s exige um valor", option)
+			return "", fmt.Errorf("%s", i18n.Tf("err.curl.optionValue", option))
 		}
 		return args[*index], nil
 	}
@@ -49,7 +50,7 @@ func ParseCurl(command string) (storage.RequestData, error) {
 			}
 			parts := strings.SplitN(value, ":", 2)
 			if len(parts) != 2 || strings.TrimSpace(parts[0]) == "" {
-				return storage.RequestData{}, fmt.Errorf("header inválido: %q", value)
+				return storage.RequestData{}, fmt.Errorf("%s", i18n.Tf("err.curl.header", value))
 			}
 			rd.Headers = append(rd.Headers, [2]string{strings.TrimSpace(parts[0]), strings.TrimSpace(parts[1])})
 		case "-d", "--data", "--data-raw", "--data-binary", "--data-ascii":
@@ -71,7 +72,7 @@ func ParseCurl(command string) (storage.RequestData, error) {
 			}
 			parts := strings.SplitN(value, "=", 2)
 			if len(parts) != 2 || parts[0] == "" {
-				return storage.RequestData{}, fmt.Errorf("campo multipart inválido: %q", value)
+				return storage.RequestData{}, fmt.Errorf("%s", i18n.Tf("err.curl.multipart", value))
 			}
 			rd.Multipart = append(rd.Multipart, [2]string{parts[0], parts[1]})
 			rd.BodyType = "multipart/form-data"
@@ -104,10 +105,10 @@ func ParseCurl(command string) (storage.RequestData, error) {
 			// These options change cURL behavior but not the HTTP request definition.
 		default:
 			if strings.HasPrefix(arg, "-") {
-				return storage.RequestData{}, fmt.Errorf("opção cURL não suportada: %s", arg)
+				return storage.RequestData{}, fmt.Errorf("%s", i18n.Tf("err.curl.option", arg))
 			}
 			if rd.URL != "" {
-				return storage.RequestData{}, fmt.Errorf("mais de uma URL foi informada")
+				return storage.RequestData{}, fmt.Errorf("%s", i18n.T("err.curl.multiURL"))
 			}
 			rd.URL = arg
 		}
@@ -131,12 +132,12 @@ func ParseCurl(command string) (storage.RequestData, error) {
 	}
 
 	if rd.URL == "" {
-		return storage.RequestData{}, fmt.Errorf("URL não encontrada no comando cURL")
+		return storage.RequestData{}, fmt.Errorf("%s", i18n.T("err.curl.noURL"))
 	}
 
 	u, err := url.Parse(rd.URL)
 	if err != nil || u.Scheme == "" || u.Host == "" {
-		return storage.RequestData{}, fmt.Errorf("URL inválida: %q", rd.URL)
+		return storage.RequestData{}, fmt.Errorf("%s", i18n.Tf("err.curl.invalidURL", rd.URL))
 	}
 	for key, values := range u.Query() {
 		for _, value := range values {
@@ -159,7 +160,7 @@ func ParseCurl(command string) (storage.RequestData, error) {
 		for _, data := range rawData {
 			values, err := url.ParseQuery(data)
 			if err != nil {
-				return storage.RequestData{}, fmt.Errorf("dados de query inválidos: %w", err)
+				return storage.RequestData{}, i18n.Errorf("err.curl.query", err)
 			}
 			for key, entries := range values {
 				for _, value := range entries {
@@ -299,10 +300,10 @@ func SplitShellArgs(command string) ([]string, error) {
 		}
 	}
 	if escaped {
-		return nil, fmt.Errorf("escape incompleto no comando cURL")
+		return nil, fmt.Errorf("%s", i18n.T("err.curl.escape"))
 	}
 	if quote != 0 {
-		return nil, fmt.Errorf("aspas não fechadas no comando cURL")
+		return nil, fmt.Errorf("%s", i18n.T("err.curl.quote"))
 	}
 	flush()
 	return args, nil

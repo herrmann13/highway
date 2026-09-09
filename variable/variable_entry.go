@@ -7,6 +7,8 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/widget"
+
+	"highway/i18n"
 )
 
 type VariableEntry struct {
@@ -15,11 +17,15 @@ type VariableEntry struct {
 }
 
 func NewVariableEntry(multiline, password bool, onAddVariable func(*VariableEntry)) *VariableEntry {
+	wrapping := fyne.TextWrapOff
+	if multiline {
+		wrapping = fyne.TextWrapWord
+	}
 	entry := &VariableEntry{
 		Entry: widget.Entry{
 			MultiLine: multiline,
 			Password:  password,
-			Wrapping:  fyne.TextWrap(fyne.TextTruncateClip),
+			Wrapping:  wrapping,
 		},
 		onAddVariable: onAddVariable,
 	}
@@ -43,7 +49,7 @@ func (e *VariableEntry) TappedSecondary(event *fyne.PointEvent) {
 	if canvas == nil {
 		return
 	}
-	item := fyne.NewMenuItem("Adicionar variável", func() { e.onAddVariable(e) })
+	item := fyne.NewMenuItem(i18n.T("variables.add"), func() { e.onAddVariable(e) })
 	pop := widget.NewPopUpMenu(fyne.NewMenu("", item), canvas)
 	position := fyne.CurrentApp().Driver().AbsolutePositionForObject(e).Add(event.Position)
 	pop.ShowAtPosition(position)
@@ -60,7 +66,7 @@ func ShowVariablePicker(w fyne.Window, entry *VariableEntry, variables [][2]stri
 		}
 	}
 	if len(names) == 0 {
-		dialog.ShowInformation("Variáveis", "Esta collection não possui variáveis configuradas.", w)
+		dialog.ShowInformation(i18n.T("variables.title"), i18n.T("variables.none"), w)
 		return
 	}
 	sort.Strings(names)
@@ -68,10 +74,10 @@ func ShowVariablePicker(w fyne.Window, entry *VariableEntry, variables [][2]stri
 	selector := widget.NewSelect(names, nil)
 	selector.SetSelected(names[0])
 	d := dialog.NewForm(
-		"Adicionar variável",
-		"Inserir",
-		"Cancelar",
-		[]*widget.FormItem{widget.NewFormItem("Variável", selector)},
+		i18n.T("variables.dialogTitle"),
+		i18n.T("variables.insert"),
+		i18n.T("common.cancel"),
+		[]*widget.FormItem{widget.NewFormItem(i18n.T("variables.field"), selector)},
 		func(ok bool) {
 			if ok {
 				entry.InsertVariable(selector.Selected)

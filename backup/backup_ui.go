@@ -9,6 +9,7 @@ import (
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/widget"
 
+	"highway/i18n"
 	"highway/storage"
 )
 
@@ -44,17 +45,17 @@ func collectionSelectionContent(names []string) *widget.CheckGroup {
 
 func ShowExportCollectionsDialog(w fyne.Window, collections []*storage.Collection) {
 	if len(collections) == 0 {
-		dialog.ShowInformation("Exportar coleções", "Não há coleções para exportar.", w)
+		dialog.ShowInformation(i18n.T("export.title"), i18n.T("export.none"), w)
 		return
 	}
 	group := collectionSelectionContent(CollectionNames(collections))
-	d := dialog.NewCustomConfirm("Exportar coleções", "Continuar", "Cancelar", container.NewVScroll(group), func(ok bool) {
+	d := dialog.NewCustomConfirm(i18n.T("export.title"), i18n.T("common.continue"), i18n.T("common.cancel"), container.NewVScroll(group), func(ok bool) {
 		if !ok {
 			return
 		}
 		selected := SelectedCollections(collections, group.Selected)
 		if len(selected) == 0 {
-			dialog.ShowInformation("Exportar coleções", "Selecione pelo menos uma coleção.", w)
+			dialog.ShowInformation(i18n.T("export.title"), i18n.T("export.selectOne"), w)
 			return
 		}
 		fileDialog := dialog.NewFileSave(func(writer fyne.URIWriteCloser, err error) {
@@ -70,7 +71,7 @@ func ShowExportCollectionsDialog(w fyne.Window, collections []*storage.Collectio
 				dialog.ShowError(err, w)
 				return
 			}
-			dialog.ShowInformation("Exportar coleções", "Exportação concluída.", w)
+			dialog.ShowInformation(i18n.T("export.title"), i18n.T("export.done"), w)
 		}, w)
 		fileDialog.SetFileName("highway-collections.json")
 		fileDialog.Show()
@@ -102,13 +103,13 @@ func ShowImportCollectionsDialog(w fyne.Window, existing []*storage.Collection, 
 func showImportSelectionDialog(w fyne.Window, existing, incoming []*storage.Collection, onImported func([]*storage.Collection)) {
 	names := CollectionNames(incoming)
 	group := collectionSelectionContent(names)
-	d := dialog.NewCustomConfirm("Importar coleções", "Importar", "Cancelar", container.NewVScroll(group), func(ok bool) {
+	d := dialog.NewCustomConfirm(i18n.T("importCollections.title"), i18n.T("common.import"), i18n.T("common.cancel"), container.NewVScroll(group), func(ok bool) {
 		if !ok {
 			return
 		}
 		selected := SelectedCollections(incoming, group.Selected)
 		if len(selected) == 0 {
-			dialog.ShowInformation("Importar coleções", "Selecione pelo menos uma coleção.", w)
+			dialog.ShowInformation(i18n.T("importCollections.title"), i18n.T("export.selectOne"), w)
 			return
 		}
 		imported := make([]*storage.Collection, 0, len(selected))
@@ -129,7 +130,7 @@ func showImportSelectionDialog(w fyne.Window, existing, incoming []*storage.Coll
 func SaveImportedCollections(collections []*storage.Collection) error {
 	for _, c := range collections {
 		if c == nil || strings.TrimSpace(c.Name) == "" {
-			return fmt.Errorf("coleção importada sem nome")
+			return fmt.Errorf("%s", i18n.T("importCollections.unnamed"))
 		}
 		if err := storage.SaveCollection(c); err != nil {
 			return err

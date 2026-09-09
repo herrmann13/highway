@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"highway/i18n"
 	"highway/version"
 )
 
@@ -51,19 +52,19 @@ func FetchLatestRelease(ctx context.Context) (GithubRelease, error) {
 	client := &http.Client{Timeout: updateTimeout}
 	resp, err := client.Do(req)
 	if err != nil {
-		return GithubRelease{}, fmt.Errorf("não foi possível consultar atualizações: %w", err)
+		return GithubRelease{}, i18n.Errorf("err.update.fetch", err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return GithubRelease{}, fmt.Errorf("GitHub retornou %s ao consultar atualizações", resp.Status)
+		return GithubRelease{}, fmt.Errorf("%s", i18n.Tf("err.update.github", resp.Status))
 	}
 
 	var release GithubRelease
 	if err := json.NewDecoder(io.LimitReader(resp.Body, 2*1024*1024)).Decode(&release); err != nil {
-		return GithubRelease{}, fmt.Errorf("resposta de atualização inválida: %w", err)
+		return GithubRelease{}, i18n.Errorf("err.update.invalid", err)
 	}
 	if _, err := ParseSemanticVersion(release.TagName); err != nil {
-		return GithubRelease{}, fmt.Errorf("a release do GitHub tem uma versão inválida: %w", err)
+		return GithubRelease{}, i18n.Errorf("err.update.version", err)
 	}
 	return release, nil
 }
@@ -112,14 +113,14 @@ func ReleaseAssetForPlatform(release GithubRelease, goos, goarch string) (Releas
 	case "darwin":
 		suffix = "-macos-" + goarch + ".dmg"
 	default:
-		return ReleaseAsset{}, fmt.Errorf("atualização não suportada em %s", goos)
+		return ReleaseAsset{}, fmt.Errorf("%s", i18n.Tf("err.update.unsupported", goos))
 	}
 	for _, asset := range release.Assets {
 		if strings.HasSuffix(asset.Name, suffix) {
 			return asset, nil
 		}
 	}
-	return ReleaseAsset{}, fmt.Errorf("a release não possui instalador para %s/%s", goos, goarch)
+	return ReleaseAsset{}, fmt.Errorf("%s", i18n.Tf("err.update.noInstaller", goos, goarch))
 }
 
 func checksumAsset(release GithubRelease) (ReleaseAsset, error) {
@@ -128,7 +129,7 @@ func checksumAsset(release GithubRelease) (ReleaseAsset, error) {
 			return asset, nil
 		}
 	}
-	return ReleaseAsset{}, fmt.Errorf("a release não possui o arquivo SHA256SUMS")
+	return ReleaseAsset{}, fmt.Errorf("%s", i18n.T("err.update.noChecksums"))
 }
 
 func DownloadAsset(ctx context.Context, asset ReleaseAsset) (string, error) {
@@ -140,11 +141,11 @@ func DownloadAsset(ctx context.Context, asset ReleaseAsset) (string, error) {
 	client := &http.Client{Timeout: updateTimeout}
 	resp, err := client.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("não foi possível baixar %s: %w", asset.Name, err)
+		return "", fmt.Errorf("%s: %w", i18n.Tf("err.update.download", asset.Name), err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("download de %s falhou: %s", asset.Name, resp.Status)
+		return "", fmt.Errorf("%s", i18n.Tf("err.update.downloadFailed", asset.Name, resp.Status))
 	}
 
 	file, err := os.CreateTemp("", "highway-update-*"+filepath.Ext(asset.Name))
@@ -179,11 +180,11 @@ func VerifyAssetChecksum(ctx context.Context, release GithubRelease, asset Relea
 	req.Header.Set("User-Agent", "Highway/"+version.AppVersion)
 	resp, err := (&http.Client{Timeout: updateTimeout}).Do(req)
 	if err != nil {
-		return fmt.Errorf("não foi possível baixar os checksums: %w", err)
+		return i18n.Errorf("err.update.checksums", err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("download de SHA256SUMS falhou: %s", resp.Status)
+		return fmt.Errorf("%s", i18n.Tf("err.update.checksumsFailed", resp.Status))
 	}
 	data, err := io.ReadAll(io.LimitReader(resp.Body, 1024*1024))
 	if err != nil {
@@ -204,7 +205,7 @@ func VerifyAssetChecksum(ctx context.Context, release GithubRelease, asset Relea
 		return err
 	}
 	if !strings.EqualFold(expected, hex.EncodeToString(hash.Sum(nil))) {
-		return fmt.Errorf("checksum inválido para %s", asset.Name)
+		return fmt.Errorf("%s", i18n.Tf("err.update.checksumInvalid", asset.Name))
 	}
 	return nil
 }
@@ -222,5 +223,5 @@ func ChecksumForAsset(content, name string) (string, error) {
 			return fields[0], nil
 		}
 	}
-	return "", fmt.Errorf("checksum não encontrado para %s", name)
+	return "", fmt.Errorf("%s", i18n.Tf("err.update.checksumMissing", name))
 }
